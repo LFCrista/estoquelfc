@@ -30,21 +30,20 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
-  const { id, role, status } = await req.json();
+  const { id, role, status, name } = await req.json();
   const { error } = await supabase
     .from("profiles")
-    .update({ role, status })
+    .update({ role, status, name })
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ message: "Atualizado com sucesso" });
 }
 
-// POST /api/users → criar novo usuário
 export async function POST(req: Request) {
   const { email, password, role, name } = await req.json();
 
-  // Cria o usuário no Supabase Auth
+  // Cria o usuário no Auth
   const { data: userData, error: userError } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -52,11 +51,27 @@ export async function POST(req: Request) {
   });
   if (userError) return NextResponse.json({ error: userError.message }, { status: 400 });
 
-  // Cria o profile
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .insert({ id: userData.user.id, role, name, email });
+  // Garante que o id foi retornado
+  const userId = userData?.user?.id;
+  if (!userId) {
+    return NextResponse.json({ error: "ID do usuário não retornado pelo Auth." }, { status: 500 });
+  }
 
+  // Aguarda a trigger criar o registro na profiles e faz update
+  let profileError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role, name, email, status: "ativo" })
+      .eq("id", userId);
+    if (!error) {
+      profileError = null;
+      break;
+    }
+    profileError = error;
+    // Aguarda 500ms antes de tentar novamente
+    await new Promise(res => setTimeout(res, 500));
+  }
   if (profileError) return NextResponse.json({ error: profileError.message }, { status: 400 });
 
   return NextResponse.json({ user: userData.user });
