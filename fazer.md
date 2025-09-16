@@ -3,8 +3,8 @@
     - Sistema de midddleware de admin. V
 
 16/09:
+    - Sistema de produtos; V
     - Sistema de prateleiras;
-    - Sistema de produtos;
     - Sistema de estoque.
 
 17/09:

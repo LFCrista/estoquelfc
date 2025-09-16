@@ -31,7 +31,15 @@ export default function UsersPage() {
     const data = await res.json();
     if (data.users) {
       setUsers(
-        data.users.map((u: any) => ({
+        data.users.map((u: {
+          id: string;
+          role: string;
+          status: string;
+          created_at: string;
+          name: string;
+          email: string;
+          last_sign_in_at?: string | null;
+        }) => ({
           id: u.id,
           role: u.role,
           status: u.status,
