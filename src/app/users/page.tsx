@@ -59,9 +59,9 @@ export default function UsersPage() {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-8" style={{ paddingLeft: 256 }}>
         <h1 className="text-3xl font-bold mb-2">Gerenciamento de Usuários</h1>
         <p className="text-muted-foreground mb-6">Controle de acesso e permissões dos usuários do sistema</p>
 

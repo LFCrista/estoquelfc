@@ -1,6 +1,6 @@
 15/09:
-    - Sistema de criação de usuário, edição e deixar inativo;
-    - Sistema de midddleware de admin.
+    - Sistema de criação de usuário, edição e deixar inativo; V
+    - Sistema de midddleware de admin. V
 
 16/09:
     - Sistema de prateleiras;
