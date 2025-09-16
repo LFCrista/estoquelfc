@@ -37,8 +37,8 @@ export function ModalEditProduto({ isOpen, onClose, produto, onSave }: ModalEdit
 	};
 
 		return (
-			<div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-				<div className="bg-white dark:bg-zinc-900 rounded-lg shadow-lg p-8 w-full max-w-md relative">
+			<div className="fixed inset-0 bg-black/1 flex items-center justify-center z-50">
+				<div className="bg-white dark:bg-zinc-900 rounded-lg p-8 w-full max-w-md relative">
 					<button className="absolute top-2 right-2 text-xl" onClick={onClose}>&times;</button>
 					<h2 className="text-2xl font-bold mb-4">Editar Produto</h2>
 					<form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); handleSave(); }}>

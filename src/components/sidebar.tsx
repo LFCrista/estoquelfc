@@ -6,12 +6,13 @@ import { Home, Box, Clock, FileText, Users, Settings, Menu } from "lucide-react"
 import Link from "next/link";
 
 const menuItems = [
-  { label: "Estoque", icon: Home, href: "/" },
-  { label: "Produtos", icon: Box, href: "/produtos" },
-  { label: "Histórico", icon: Clock },
-  { label: "Relatórios", icon: FileText },
-  { label: "Usuários", icon: Users, href: "/users" },
-  { label: "Configurações", icon: Settings },
+	{ label: "Estoque", icon: Home, href: "/" },
+	{ label: "Produtos", icon: Box, href: "/produtos" },
+	{ label: "Prateleiras", icon: Box, href: "/prateleiras" },
+	{ label: "Histórico", icon: Clock },
+	{ label: "Relatórios", icon: FileText },
+	{ label: "Usuários", icon: Users, href: "/users" },
+	{ label: "Configurações", icon: Settings },
 ];
 
 export function Sidebar() {
