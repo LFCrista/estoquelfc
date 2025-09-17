@@ -6,7 +6,7 @@ import { Home, Box, Clock, FileText, Users, Settings, Menu } from "lucide-react"
 import Link from "next/link";
 
 const menuItems = [
-	{ label: "Estoque", icon: Home, href: "/" },
+	{ label: "Estoque", icon: Home, href: "/estoque" },
 	{ label: "Produtos", icon: Box, href: "/produtos" },
 	{ label: "Prateleiras", icon: Box, href: "/prateleiras" },
 	{ label: "Histórico", icon: Clock },
