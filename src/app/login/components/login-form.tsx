@@ -45,7 +45,7 @@ export function LoginForm({
         // Salva o profileId no localStorage
         localStorage.setItem("profileId", data.user.profileId);
         // redireciona
-        router.push("/users")
+        router.push("/estoque")
       }
     } catch {
       setError("Erro inesperado, tente novamente.")
