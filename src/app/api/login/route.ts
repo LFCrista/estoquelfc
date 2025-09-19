@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers';
 
 export async function POST(req: Request) {
   const { email, password } = await req.json()
@@ -46,13 +47,21 @@ export async function POST(req: Request) {
     )
   }
 
-  // Se passou, retorna dados do usuário + role/status/id do perfil
+  // Define o token nos cookies
+  (await
+    // Define o token nos cookies
+    cookies()).set('auth-token', user.id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  });
+
   return NextResponse.json({
     user: {
       ...user,
       role: profile.role,
       status: profile.status,
-      profileId: profile.id, // Adiciona o id do perfil
+      profileId: profile.id, 
     },
   })
 }

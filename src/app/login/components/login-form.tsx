@@ -42,6 +42,8 @@ export function LoginForm({
         setError(data.error || "Erro ao fazer login")
       } else {
         console.log("Usuário logado:", data.user)
+        // Salva o profileId no localStorage
+        localStorage.setItem("profileId", data.user.profileId);
         // redireciona
         router.push("/users")
       }

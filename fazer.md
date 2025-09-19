@@ -7,7 +7,7 @@
     - Sistema de "Exclusão de livros e prateleiras" - coluna banco de dados status ativo/inativo
     - Excluir estroque dinamicamente quando livros e prateleiras forem "excluidos"
     - Sistema de login e segurança nas rotas
-    - Sistema de histórico
+    - Sistema de histórico V
     - Polir os sistema:
         - não permitir clique duplo no formulário
         - configurações com opção de darkmode
