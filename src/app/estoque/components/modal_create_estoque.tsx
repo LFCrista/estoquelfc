@@ -131,15 +131,66 @@ export function ModalCreateEstoque({
           className="flex flex-col gap-4"
           onSubmit={async (e) => {
             e.preventDefault();
-            await onEstoqueCreated({
-              produto_id: produtoId,
-              prateleira_id: prateleiraId,
-              quantidade,
-            });
-            setProdutoId("");
-            setPrateleiraId("");
-            setQuantidade(1);
-            onClose();
+            try {
+              const userId = localStorage.getItem("profileId");
+
+              if (!userId) {
+                alert("User ID não encontrado no localStorage.");
+                return;
+              }
+
+              const res = await fetch("/api/estoque", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  produto_id: produtoId,
+                  prateleira_id: prateleiraId,
+                  quantidade,
+                }),
+              });
+              const data = await res.json();
+
+              if (!res.ok) {
+                alert(data.error || "Erro ao criar estoque");
+                return;
+              }
+
+              const estoqueId = data.estoqueId;
+
+              if (!estoqueId) {
+                alert("ID do estoque não retornado pela API.");
+                return;
+              }
+
+              const historicoRes = await fetch("/api/historico", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  user_id: userId,
+                  entidade: "estoque",
+                  entidade_id: estoqueId,
+                  acao: "Adicionou Estoque",
+                  quantidade,
+                }),
+              });
+
+              const historicoData = await historicoRes.json();
+
+              if (!historicoRes.ok) {
+                console.error("Erro ao registrar histórico:", historicoData);
+                alert(historicoData.error || "Erro ao registrar histórico");
+                return;
+              }
+
+              setProdutoId("");
+              setPrateleiraId("");
+              setQuantidade(1);
+              onEstoqueCreated({ produto_id: produtoId, prateleira_id: prateleiraId, quantidade });
+              onClose();
+            } catch (err) {
+              console.error("Erro inesperado ao criar estoque:", err);
+              alert("Erro inesperado ao criar estoque");
+            }
           }}
         >
           {/* Produto */}

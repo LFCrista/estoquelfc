@@ -101,7 +101,7 @@ export async function GET(req: Request) {
             .eq("id", item.entidade_id)
             .single();
           atualizacao = prateleiraData?.nome || "";
-        } else if (item.entidade === "Estoque") {
+        } else if (item.entidade === "estoque") {
           const { data: estoqueData } = await supabase
             .from("estoque")
             .select("produto_id, prateleira_id")
@@ -110,18 +110,18 @@ export async function GET(req: Request) {
 
           if (estoqueData) {
             const { data: produtoData } = await supabase
-              .from("produto")
+              .from("produtos")
               .select("nome")
               .eq("id", estoqueData.produto_id)
               .single();
 
             const { data: prateleiraData } = await supabase
-              .from("prateleira")
+              .from("prateleiras")
               .select("nome")
               .eq("id", estoqueData.prateleira_id)
               .single();
 
-            atualizacao = `${produtoData?.nome || ""} -- ${prateleiraData?.nome || ""}`;
+            atualizacao = `${produtoData?.nome || ""} - ${prateleiraData?.nome || ""}`;
           }
         }
 

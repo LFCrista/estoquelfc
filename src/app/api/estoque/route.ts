@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,18 +34,20 @@ export async function POST(req: Request) {
 				return NextResponse.json({ error: updateError.message }, { status: 400 });
 			}
 			console.log("Estoque atualizado com sucesso");
-			return NextResponse.json({ message: "Estoque atualizado com sucesso" });
+			return NextResponse.json({ message: "Estoque atualizado com sucesso", estoqueId: existing.id });
 		} else {
 			// Cria novo item
-			const { error } = await supabase
+			const { data: newEstoque, error } = await supabase
 				.from("estoque")
-				.insert([{ produto_id, prateleira_id, quantidade }]);
+				.insert([{ produto_id, prateleira_id, quantidade }])
+				.select("id")
+				.single();
 			if (error) {
 				console.error("Erro ao criar novo estoque:", error);
 				return NextResponse.json({ error: error.message }, { status: 400 });
 			}
 			console.log("Estoque cadastrado com sucesso");
-			return NextResponse.json({ message: "Estoque cadastrado com sucesso" });
+			return NextResponse.json({ message: "Estoque cadastrado com sucesso", estoqueId: newEstoque.id });
 		}
 	} catch (err) {
 		console.error("Erro inesperado no POST /api/estoque:", err);

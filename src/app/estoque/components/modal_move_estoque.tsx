@@ -68,28 +68,57 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prateleiraId, livro.id, tipo, isOpen]);
 
-  // (Removido: agora a busca é feita via API)
-
   if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!quantidade || quantidade < 1) return;
 
-    await fetch("/api/estoque", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: estoqueId, 
-        produto_id: livro.id,
-        prateleira_id: prateleiraId,
-        tipo,
-        quantidade
-      })
-    });
+    try {
+      const userId = localStorage.getItem("profileId");
 
-    if (onSubmit) onSubmit({ tipo, prateleiraId, quantidade, estoqueId });
-    onClose();
+      if (!userId) {
+        console.error("User ID não encontrado no localStorage.");
+        return;
+      }
+
+      await fetch("/api/estoque", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: estoqueId,
+          produto_id: livro.id,
+          prateleira_id: prateleiraId,
+          tipo,
+          quantidade,
+        }),
+      });
+
+      const acao = tipo === "adicionar" ? "Adicionou Estoque" : "Removeu Estoque";
+
+      const historicoRes = await fetch("/api/historico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          entidade: "estoque",
+          entidade_id: estoqueId,
+          acao,
+          quantidade,
+        }),
+      });
+
+      const historicoData = await historicoRes.json();
+
+      if (!historicoRes.ok) {
+        console.error("Erro ao registrar histórico:", historicoData);
+      }
+
+      if (onSubmit) onSubmit({ tipo, prateleiraId, quantidade, estoqueId });
+      onClose();
+    } catch (err) {
+      console.error("Erro inesperado ao movimentar estoque:", err);
+    }
   }
 
   return (
