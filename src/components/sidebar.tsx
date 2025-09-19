@@ -9,7 +9,7 @@ const menuItems = [
 	{ label: "Estoque", icon: Home, href: "/estoque" },
 	{ label: "Produtos", icon: Box, href: "/produtos" },
 	{ label: "Prateleiras", icon: Box, href: "/prateleiras" },
-	{ label: "Histórico", icon: Clock },
+	{ label: "Histórico", icon: Clock, href: "/historico" },
 	{ label: "Relatórios", icon: FileText },
 	{ label: "Usuários", icon: Users, href: "/users" },
 	{ label: "Configurações", icon: Settings },

@@ -10,30 +10,66 @@ interface ModalCreateUserProps {
 }
 
 export function ModalCreateUser({ isOpen, onClose, onUserCreated }: ModalCreateUserProps) {
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [name, setName] = useState("");
-	const [role, setRole] = useState("user");
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+		const [email, setEmail] = useState("");
+		const [password, setPassword] = useState("");
+		const [name, setName] = useState("");
+		const [role, setRole] = useState("user");
+		const [loading, setLoading] = useState(false);
+		const [error, setError] = useState<string | null>(null);
 
 
 		async function handleSubmit(e: React.FormEvent) {
 			e.preventDefault();
 			setLoading(true);
 			setError(null);
+
 			try {
+				const userId = localStorage.getItem("profileId"); 
+
+				if (!userId) {
+					setError("User ID não encontrado no localStorage.");
+					setLoading(false);
+					return;
+				}
+
 				const res = await fetch("/api/users", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ email, password, name, role })
 				});
 				const data = await res.json();
+
 				if (!res.ok) {
 					setError(data.error || "Erro ao cadastrar usuário");
 					setLoading(false);
 					return;
 				}
+
+				// Usa o ID do perfil criado como entidade_id
+				const profileId = data.user?.profileId;
+
+				if (!profileId) {
+					setError("ID do perfil não retornado pela API.");
+					setLoading(false);
+					return;
+				}
+
+				
+				const historicoRes = await fetch("/api/historico", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ user_id: userId, entidade: "user", entidade_id: profileId, acao: "Criou Usuário", quantidade: null }),
+				});
+
+				const historicoData = await historicoRes.json();
+
+				if (!historicoRes.ok) {
+					console.error("Erro ao registrar histórico:", historicoData);
+					setError(historicoData.error || "Erro ao registrar histórico");
+					setLoading(false);
+					return;
+				}
+
 				setEmail("");
 				setPassword("");
 				setName("");
@@ -41,6 +77,7 @@ export function ModalCreateUser({ isOpen, onClose, onUserCreated }: ModalCreateU
 				onUserCreated();
 				onClose();
 			} catch (err) {
+				console.error("Erro inesperado ao cadastrar usuário:", err);
 				setError("Erro inesperado ao cadastrar usuário");
 			} finally {
 				setLoading(false);

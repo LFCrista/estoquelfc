@@ -57,22 +57,50 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ID do usuário não retornado pelo Auth." }, { status: 500 });
   }
 
-  // Aguarda a trigger criar o registro na profiles e faz update
-  let profileError = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role, name, email, status: "ativo" })
-      .eq("id", userId);
-    if (!error) {
-      profileError = null;
-      break;
-    }
-    profileError = error;
-    // Aguarda 500ms antes de tentar novamente
-    await new Promise(res => setTimeout(res, 500));
-  }
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 400 });
+  // Verifica se o registro já existe na tabela profiles
+  const { data: existingProfile, error: fetchError } = await supabase
+    .from("profiles")
+    .select("id, user_id")
+    .eq("user_id", userId)
+    .single();
 
-  return NextResponse.json({ user: userData.user });
+  if (fetchError && fetchError.code !== "PGRST116") { // Ignora erro de registro não encontrado
+    return NextResponse.json({ error: fetchError.message }, { status: 400 });
+  }
+
+  let profileId;
+
+  if (existingProfile) {
+    // Atualiza o registro existente
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ name, role })
+      .eq("user_id", userId);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 400 });
+    }
+
+    profileId = existingProfile.id;
+  } else {
+    // Insere um novo registro
+    const { data: newProfile, error: insertError } = await supabase
+      .from("profiles")
+      .insert({ user_id: userId, name, role })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 400 });
+    }
+
+    profileId = newProfile.id;
+  }
+
+  return NextResponse.json({
+    user: {
+      ...userData.user,
+      profileId, // Inclui o ID do perfil na resposta
+    },
+  });
 }

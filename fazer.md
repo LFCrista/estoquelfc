@@ -1,11 +1,13 @@
-15/09:
     - Sistema de criação de usuário, edição e deixar inativo; V
     - Sistema de midddleware de admin. V
-
-16/09:
     - Sistema de produtos; V
-    - Sistema de prateleiras;
-    - Sistema de estoque.
-
-17/09:
-    - Sistema de histórico.
+    - Sistema de prateleiras; V
+    - Sistema de estoque.V
+    - Adicionar uma nova tabela no modal de mover estoque
+    - Sistema de "Exclusão de livros e prateleiras" - coluna banco de dados status ativo/inativo
+    - Excluir estroque dinamicamente quando livros e prateleiras forem "excluidos"
+    - Sistema de login e segurança nas rotas
+    - Sistema de histórico
+    - Polir os sistema:
+        - não permitir clique duplo no formulário
+        - configurações com opção de darkmode

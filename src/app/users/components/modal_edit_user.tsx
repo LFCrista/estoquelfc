@@ -31,13 +31,59 @@ export function ModalEditUser({ isOpen, onClose, user, onSave }: ModalEditUserPr
 
   const handleSave = async () => {
     setSaving(true);
+
+    const changes: string[] = [];
+
+    if (name !== user.name) changes.push("Alterou nome");
+    if (role !== user.role) changes.push("Alterou cargo");
+    if (status !== user.status) {
+      if (status === "inativo") {
+        changes.push("Desativou");
+      } else {
+        changes.push("Ativou");
+      }
+    }
+
+    const action = changes.join(", ");
+
     await onSave({ id: user.id, name, role, status });
-    setSaving(false);
-    onClose();
+
+    try {
+      const userId = localStorage.getItem("profileId");
+
+      if (!userId) {
+        console.error("User ID não encontrado no localStorage.");
+        setSaving(false);
+        return;
+      }
+
+      const historicoRes = await fetch("/api/historico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          entidade: "user",
+          entidade_id: user.id,
+          acao: action,
+          quantidade: null,
+        }),
+      });
+
+      const historicoData = await historicoRes.json();
+
+      if (!historicoRes.ok) {
+        console.error("Erro ao registrar histórico:", historicoData);
+      }
+    } catch (err) {
+      console.error("Erro inesperado ao registrar histórico:", err);
+    } finally {
+      setSaving(false);
+      onClose();
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/8">
       <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
         <h2 className="text-xl font-semibold mb-4">Editar Usuário</h2>
         <div className="mb-4">

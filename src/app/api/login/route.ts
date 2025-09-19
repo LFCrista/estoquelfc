@@ -27,8 +27,8 @@ export async function POST(req: Request) {
   // 2. Busca o perfil do usuário
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, status')
-    .eq('id', user.id)
+    .select('id, role, status') // Inclui o campo id
+    .eq('user_id', user.id)
     .single()
 
   if (profileError || !profile) {
@@ -46,12 +46,13 @@ export async function POST(req: Request) {
     )
   }
 
-  // Se passou, retorna dados do usuário + role/status
+  // Se passou, retorna dados do usuário + role/status/id do perfil
   return NextResponse.json({
     user: {
       ...user,
       role: profile.role,
       status: profile.status,
+      profileId: profile.id, // Adiciona o id do perfil
     },
   })
 }
