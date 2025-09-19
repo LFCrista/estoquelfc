@@ -1,22 +1,3 @@
-export async function POST(req: Request) {
-	const { nome } = await req.json();
-	const { error } = await supabase
-		.from("prateleiras")
-		.insert([{ nome }]);
-	if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-	return NextResponse.json({ message: "Prateleira cadastrada com sucesso" });
-}
-
-export async function PATCH(req: Request) {
-	const { id, nome } = await req.json();
-	const { error } = await supabase
-		.from("prateleiras")
-		.update({ nome })
-		.eq("id", id);
-	if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-	return NextResponse.json({ message: "Prateleira atualizada com sucesso" });
-}
-
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -52,4 +33,38 @@ export async function GET(req: Request) {
 
 	if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 	return NextResponse.json({ prateleiras: data, total: count });
+}
+
+export async function POST(req: Request) {
+	const { nome } = await req.json();
+
+	const { data: prateleiraData, error: prateleiraError } = await supabase
+		.from("prateleiras")
+		.insert([{ nome }])
+		.select("id")
+		.single();
+
+	if (prateleiraError) {
+		return NextResponse.json({ error: prateleiraError.message }, { status: 400 });
+	}
+
+	return NextResponse.json({
+		message: "Prateleira cadastrada com sucesso.",
+		prateleiraId: prateleiraData.id,
+	});
+}
+
+export async function PATCH(req: Request) {
+	const { id, nome } = await req.json();
+
+	const { error: updateError } = await supabase
+		.from("prateleiras")
+		.update({ nome })
+		.eq("id", id);
+
+	if (updateError) {
+		return NextResponse.json({ error: updateError.message }, { status: 400 });
+	}
+
+	return NextResponse.json({ message: "Prateleira atualizada com sucesso." });
 }

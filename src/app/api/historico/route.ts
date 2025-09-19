@@ -94,9 +94,9 @@ export async function GET(req: Request) {
             .eq("id", item.entidade_id)
             .single();
           atualizacao = produtoData?.nome || "";
-        } else if (item.entidade === "Prateleiras") {
+        } else if (item.entidade === "prateleira") {
           const { data: prateleiraData } = await supabase
-            .from("prateleira")
+            .from("prateleiras")
             .select("nome")
             .eq("id", item.entidade_id)
             .single();

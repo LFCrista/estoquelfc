@@ -37,14 +37,47 @@ export default function PrateleirasPage() {
 		await fetchPrateleiras({ page, search, searchField });
 	}
 
-	async function handleCreatePrateleira(newPrateleira: { nome: string }) {
-		await fetch("/api/prateleiras", {
+	async function handleCreatePrateleira(newPrateleira: { nome: string }): Promise<{ prateleiraId: string }> {
+		const res = await fetch("/api/prateleiras", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(newPrateleira)
 		});
+		const data = await res.json();
+
+		if (!res.ok) {
+			console.error("Erro ao criar prateleira:", data);
+			throw new Error(data.error || "Erro ao criar prateleira");
+		}
+
+		const userId = localStorage.getItem("profileId");
+		if (!userId) {
+			console.error("User ID não encontrado no localStorage.");
+			throw new Error("User ID não encontrado no localStorage.");
+		}
+
+		const historicoRes = await fetch("/api/historico", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				user_id: userId,
+				entidade: "prateleira",
+				entidade_id: data.prateleiraId,
+				acao: "Criou Prateleira",
+				quantidade: null
+			})
+		});
+		const historicoData = await historicoRes.json();
+
+		if (!historicoRes.ok) {
+			console.error("Erro ao registrar histórico:", historicoData);
+			throw new Error(historicoData.error || "Erro ao registrar histórico");
+		}
+
 		setModalCreateOpen(false);
 		await fetchPrateleiras({ page, search, searchField });
+
+		return { prateleiraId: data.prateleiraId };
 	}
 
 	async function fetchPrateleiras({ page, search, searchField }: { page: number; search: string; searchField: string }) {
