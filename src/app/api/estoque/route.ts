@@ -117,7 +117,7 @@ export async function PATCH(req: Request) {
 
 		// Caso contrário, apenas edita produto/prateleira
 		if (id && (produto_id || prateleira_id)) {
-			const updateData: any = {};
+			const updateData: Record<string, string | number> = {};
 			if (produto_id) updateData.produto_id = produto_id;
 			if (prateleira_id) updateData.prateleira_id = prateleira_id;
 			const { error } = await supabase

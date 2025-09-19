@@ -43,7 +43,7 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
         const res = await fetch(`/api/estoque?search=${encodeURIComponent(livro.id)}&searchField=produto_id`);
         const json = await res.json();
         if (json.estoque && Array.isArray(json.estoque)) {
-          const found = json.estoque.find((e: any) => String(e.produto_id) === String(livro.id) && String(e.prateleira_id) === String(prateleiraId));
+          const found = json.estoque.find((e: { produto_id: string; prateleira_id: string; id: string; quantidade: number }) => String(e.produto_id) === String(livro.id) && String(e.prateleira_id) === String(prateleiraId));
           setEstoqueId(found?.id);
           setMaxRetirar(found?.quantidade ?? 1);
           if (tipo === "retirar") {
@@ -65,7 +65,6 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
     if (isOpen && prateleiraId) {
       fetchEstoque();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prateleiraId, livro.id, tipo, isOpen]);
 
   if (!isOpen) return null;

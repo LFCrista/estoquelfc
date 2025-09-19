@@ -38,13 +38,11 @@ export function ModalCreateEstoque({
   const [searchField, setSearchField] = useState<"nome" | "SKU" | "codBarras">(
     "nome"
   );
-  const [loadingProdutos, setLoadingProdutos] = useState(false);
   const [showProdutoDropdown, setShowProdutoDropdown] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Prateleira search
   const [prateleiraSearch, setPrateleiraSearch] = useState("");
-  const [loadingPrateleiras, setLoadingPrateleiras] = useState(false);
   const [showPrateleiraDropdown, setShowPrateleiraDropdown] = useState(false);
   const prateleiraInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +55,6 @@ export function ModalCreateEstoque({
     }
     let ignore = false;
     async function fetchProdutos() {
-      setLoadingProdutos(true);
       const params = new URLSearchParams({
         page: "1",
         limit: "20",
@@ -70,7 +67,6 @@ export function ModalCreateEstoque({
         setProdutos(data.produtos || []);
         setShowProdutoDropdown(true);
       }
-      setLoadingProdutos(false);
     }
     fetchProdutos();
     return () => {
@@ -94,7 +90,6 @@ export function ModalCreateEstoque({
     }
     let ignore = false;
     async function fetchPrateleiras() {
-      setLoadingPrateleiras(true);
       const params = new URLSearchParams({
         page: "1",
         limit: "20",
@@ -107,7 +102,6 @@ export function ModalCreateEstoque({
         setPrateleiras(data.prateleiras || []);
         setShowPrateleiraDropdown(true);
       }
-      setLoadingPrateleiras(false);
     }
     fetchPrateleiras();
     return () => {

@@ -1,4 +1,3 @@
-    
 "use client";
 import { useEffect, useState } from "react";
 import { Sidebar } from "../../components/sidebar";
@@ -22,7 +21,7 @@ interface Estoque {
 export default function EstoquePage() {
 	const [estoque, setEstoque] = useState<Estoque[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [search, setSearch] = useState("");
+	const [search] = useState("");
 	const [searchField] = useState<"produto_id" | "prateleira_id">("produto_id");
 	const [page, setPage] = useState(1);
 	const [total, setTotal] = useState(0);
