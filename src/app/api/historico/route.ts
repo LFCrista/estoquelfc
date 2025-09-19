@@ -87,9 +87,9 @@ export async function GET(req: Request) {
             .eq("id", item.entidade_id)
             .single();
           atualizacao = userDetail?.name || "";
-        } else if (item.entidade === "Produtos") {
+        } else if (item.entidade === "produto") {
           const { data: produtoData } = await supabase
-            .from("produto")
+            .from("produtos")
             .select("nome")
             .eq("id", item.entidade_id)
             .single();

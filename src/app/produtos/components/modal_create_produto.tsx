@@ -19,23 +19,56 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 		setSaving(true);
 		setError(null);
 		try {
+			const userId = localStorage.getItem("profileId");
+
+			if (!userId) {
+				setError("User ID não encontrado no localStorage.");
+				setSaving(false);
+				return;
+			}
+
 			const res = await fetch("/api/produtos", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ nome, SKU, codBarras })
 			});
 			const data = await res.json();
+
 			if (!res.ok) {
 				setError(data.error || "Erro ao cadastrar produto");
 				setSaving(false);
 				return;
 			}
+
+			const produtoId = data.produtoId;
+
+			const historicoRes = await fetch("/api/historico", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					user_id: userId,
+					entidade: "produto",
+					entidade_id: produtoId,
+					acao: "Criou Produto",
+					quantidade: null
+				})
+			});
+			const historicoData = await historicoRes.json();
+
+			if (!historicoRes.ok) {
+				console.error("Erro ao registrar histórico:", historicoData);
+				setError(historicoData.error || "Erro ao registrar histórico");
+				setSaving(false);
+				return;
+			}
+
 			setNome("");
 			setSKU("");
 			setCodBarras("");
 			onProdutoCreated();
 			onClose();
 		} catch (err) {
+			console.error("Erro inesperado ao cadastrar produto:", err);
 			setError("Erro inesperado ao cadastrar produto");
 		} finally {
 			setSaving(false);

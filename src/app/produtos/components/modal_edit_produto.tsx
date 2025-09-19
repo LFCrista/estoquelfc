@@ -31,9 +31,49 @@ export function ModalEditProduto({ isOpen, onClose, produto, onSave }: ModalEdit
 
 	const handleSave = async () => {
 		setSaving(true);
+
+		const changes: string[] = [];
+
+		if (nome !== produto.nome) changes.push("Alterou nome do produto");
+		if (SKU !== produto.SKU) changes.push("Alterou SKU do produto");
+		if (codBarras !== produto.codBarras) changes.push("Alterou código de barras do produto");
+
+		const action = changes.join(", ");
+
 		await onSave({ id: produto.id, nome, SKU, codBarras });
-		setSaving(false);
-		onClose();
+
+		try {
+			const userId = localStorage.getItem("profileId");
+
+			if (!userId) {
+				console.error("User ID não encontrado no localStorage.");
+				setSaving(false);
+				return;
+			}
+
+			const historicoRes = await fetch("/api/historico", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					user_id: userId,
+					entidade: "produto",
+					entidade_id: produto.id,
+					acao: action,
+					quantidade: null,
+				}),
+			});
+
+			const historicoData = await historicoRes.json();
+
+			if (!historicoRes.ok) {
+				console.error("Erro ao registrar histórico:", historicoData);
+			}
+		} catch (err) {
+			console.error("Erro inesperado ao registrar histórico:", err);
+		} finally {
+			setSaving(false);
+			onClose();
+		}
 	};
 
 		return (

@@ -1,10 +1,25 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export async function POST(req: Request) {
   const { nome, SKU, codBarras } = await req.json();
-  const { error } = await supabase
+  const { data: produtoData, error } = await supabase
     .from("produtos")
-    .insert([{ nome, SKU, codBarras }]);
+    .insert([{ nome, SKU, codBarras }])
+    .select("id")
+    .single();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ message: "Produto cadastrado com sucesso" });
+
+  return NextResponse.json({
+    message: "Produto cadastrado com sucesso",
+    produtoId: produtoData.id, // Inclui o ID do produto na resposta
+  });
 }
 export async function PATCH(req: Request) {
   const { id, nome, SKU, codBarras } = await req.json();
@@ -15,14 +30,6 @@ export async function PATCH(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ message: "Produto atualizado com sucesso" });
 }
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get("page") || "1", 10);
