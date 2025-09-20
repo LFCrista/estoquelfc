@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
 	if (search) {
 		if (["nome"].includes(searchField)) {
-			query = query.ilike(searchField, `%${search}%`);
+			query = query.ilike(searchField, `${search}%`); // Ajusta para buscar apenas termos que começam com o valor pesquisado
 		}
 	}
 

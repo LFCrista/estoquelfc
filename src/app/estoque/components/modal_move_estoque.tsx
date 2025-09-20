@@ -22,6 +22,10 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
   const [quantidade, setQuantidade] = useState(1);
   const [maxRetirar, setMaxRetirar] = useState(1);
   const [estoqueId, setEstoqueId] = useState<string | undefined>(prateleiras[0]?.estoqueId);
+  const [activeTab, setActiveTab] = useState("relacionadas"); // Nova aba para prateleiras não relacionadas
+  const [prateleirasNaoRelacionadas, setPrateleirasNaoRelacionadas] = useState<PrateleiraEstoque[]>([]);
+  const [prateleiraSearch, setPrateleiraSearch] = useState("");
+  const [showPrateleiraDropdown, setShowPrateleiraDropdown] = useState(false);
 
   // Sempre que o modal abrir ou as prateleiras mudarem, inicializa prateleiraId e estoqueId
   useEffect(() => {
@@ -67,6 +71,53 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
     }
   }, [prateleiraId, livro.id, tipo, isOpen]);
 
+  // Busca prateleiras que não têm relação com o produto atual
+  useEffect(() => {
+    async function fetchPrateleirasNaoRelacionadas() {
+      if (!livro.id) return;
+      try {
+        const res = await fetch(`/api/prateleiras?produtoId=${livro.id}&relacionadas=false`);
+        const data = await res.json();
+        if (res.ok) {
+          setPrateleirasNaoRelacionadas(data.prateleiras);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar prateleiras não relacionadas:", err);
+      }
+    }
+
+    if (isOpen) {
+      fetchPrateleirasNaoRelacionadas();
+    }
+  }, [isOpen, livro.id]);
+
+  useEffect(() => {
+    if (prateleiraSearch.trim().length < 2) {
+      setPrateleirasNaoRelacionadas([]);
+      setShowPrateleiraDropdown(false);
+      return;
+    }
+    let ignore = false;
+    async function fetchPrateleirasNaoRelacionadas() {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "20",
+        search: prateleiraSearch.trim(),
+        searchField: "nome",
+      });
+      const res = await fetch(`/api/prateleiras?${params}`);
+      const data = await res.json();
+      if (!ignore) {
+        setPrateleirasNaoRelacionadas(data.prateleiras || []);
+        setShowPrateleiraDropdown(true);
+      }
+    }
+    fetchPrateleirasNaoRelacionadas();
+    return () => {
+      ignore = true;
+    };
+  }, [prateleiraSearch]);
+
   if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -81,36 +132,100 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
         return;
       }
 
-      await fetch("/api/estoque", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: estoqueId,
-          produto_id: livro.id,
-          prateleira_id: prateleiraId,
-          tipo,
-          quantidade,
-        }),
-      });
+      if (tipo === "adicionar") {
+        const response = await fetch("/api/estoque", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            produto_id: livro.id,
+            prateleira_id: prateleiraId,
+            quantidade,
+          }),
+        });
 
-      const acao = tipo === "adicionar" ? "Adicionou Estoque" : "Removeu Estoque";
+        const data = await response.json();
 
-      const historicoRes = await fetch("/api/historico", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          entidade: "estoque",
-          entidade_id: estoqueId,
-          acao,
-          quantidade,
-        }),
-      });
+        if (!response.ok) {
+          console.error("Erro ao criar estoque:", data);
+          return;
+        }
 
-      const historicoData = await historicoRes.json();
+        const estoqueId = data.estoqueId; // EstoqueId retornado pelo POST
 
-      if (!historicoRes.ok) {
-        console.error("Erro ao registrar histórico:", historicoData);
+        const historicoRes = await fetch("/api/historico", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            entidade: "estoque",
+            entidade_id: estoqueId, 
+            acao: "Adicionou Estoque",
+            quantidade,
+          }),
+        });
+
+        const historicoData = await historicoRes.json();
+
+        if (!historicoRes.ok) {
+          console.error("Erro ao registrar histórico para nova prateleira:", historicoData);
+        }
+      } else {
+        await fetch("/api/estoque", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: estoqueId,
+            produto_id: livro.id,
+            prateleira_id: prateleiraId,
+            tipo,
+            quantidade,
+          }),
+        });
+
+        const acaoHistorico = tipo === "retirar" ? "Removeu Estoque" : ""; 
+
+        if (!acaoHistorico) {
+          console.error("Tipo inválido para movimentação de estoque.");
+          return;
+        }
+
+        if (activeTab === "relacionadas") {
+          const historicoRes = await fetch("/api/historico", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: userId,
+              entidade: "estoque",
+              entidade_id: estoqueId,
+              acao: acaoHistorico, // Usa a variável de escopo
+              quantidade,
+            }),
+          });
+
+          const historicoData = await historicoRes.json();
+
+          if (!historicoRes.ok) {
+            console.error("Erro ao registrar histórico:", historicoData);
+          }
+        } else if (activeTab === "naoRelacionadas") {
+          const historicoRes = await fetch("/api/historico", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: userId,
+              entidade: "estoque",
+              entidade_id: prateleiraId, // Usar o ID da nova prateleira
+              acao: "Adicionou Estoque",
+              quantidade,
+            }),
+          });
+
+          const historicoData = await historicoRes.json();
+
+          if (!historicoRes.ok) {
+            console.error("Erro ao registrar histórico para nova prateleira:", historicoData);
+          }
+        }
       }
 
       if (onSubmit) onSubmit({ tipo, prateleiraId, quantidade, estoqueId });
@@ -133,41 +248,112 @@ export function ModalMoveEstoque({ isOpen, onClose, livro, prateleiras, onSubmit
         </div>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {/* Seleção de prateleira */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Prateleira</label>
-            <select
-              className="w-full border rounded px-3 py-2 bg-background text-foreground"
-              value={prateleiraId}
-              onChange={e => setPrateleiraId(e.target.value)}
-            >
-              {prateleiras.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.nome} (Qtd: {p.quantidade})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Toggle adicionar/retirar */}
-          <div className="flex w-full mb-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 p-1 gap-1">
-            {[
-              { label: "Adicionar", value: "adicionar" },
-              { label: "Retirar", value: "retirar" }
-            ].map(opt => (
+          <div className="flex w-full mb-4 rounded-lg bg-zinc-100 dark:bg-zinc-800 p-1 gap-1">
+            {[{ label: "Relacionadas", value: "relacionadas" }, { label: "Não Relacionadas", value: "naoRelacionadas" }].map((tab) => (
               <button
-                key={opt.value}
+                key={tab.value}
                 type="button"
                 className={`flex-1 py-2 rounded-lg font-semibold transition text-sm ${
-                  tipo === opt.value
+                  activeTab === tab.value
                     ? "bg-amber-400 text-white shadow"
                     : "bg-transparent text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                 }`}
-                onClick={() => setTipo(opt.value as "adicionar" | "retirar")}
+                onClick={() => setActiveTab(tab.value)}
               >
-                {opt.label}
+                {tab.label}
               </button>
             ))}
           </div>
+
+          {activeTab === "relacionadas" && (
+            <div>
+              {/* Conteúdo para prateleiras relacionadas */}
+              <label className="block text-sm font-medium mb-1">Prateleira</label>
+              <select
+                className="w-full border rounded px-3 py-2 bg-background text-foreground"
+                value={prateleiraId}
+                onChange={(e) => setPrateleiraId(e.target.value)}
+              >
+                {prateleiras.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome} (Qtd: {p.quantidade})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {activeTab === "naoRelacionadas" && (
+            <div className="relative">
+              <label className="block text-sm font-medium mb-1">Prateleira</label>
+              <input
+                type="text"
+                placeholder="Pesquisar por nome..."
+                className="border border-border rounded px-3 py-2 bg-background text-foreground w-full focus:outline-none focus:ring-2 focus:ring-amber-500"
+                value={prateleiraSearch}
+                onChange={(e) => {
+                  setPrateleiraSearch(e.target.value);
+                  setShowPrateleiraDropdown(true);
+                }}
+                onFocus={() => {
+                  if (prateleirasNaoRelacionadas.length > 0) setShowPrateleiraDropdown(true);
+                }}
+                autoComplete="off"
+              />
+              {showPrateleiraDropdown && prateleirasNaoRelacionadas.length > 0 && (
+                <ul className="absolute left-0 top-full mt-1 border rounded bg-white dark:bg-zinc-900 max-h-48 overflow-y-auto shadow z-[999] w-full">
+                  {prateleirasNaoRelacionadas.map((prat) => (
+                    <li
+                      key={prat.id}
+                      className={`px-3 py-2 cursor-pointer hover:bg-amber-100 dark:hover:bg-zinc-800 ${
+                        prateleiraId === prat.id ? "bg-amber-50 dark:bg-zinc-800" : ""
+                      }`}
+                      onClick={() => {
+                        setPrateleiraId(prat.id);
+                        setPrateleiraSearch(prat.nome);
+                        setShowPrateleiraDropdown(false);
+                      }}
+                    >
+                      <span className="font-semibold">{prat.nome}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <input type="hidden" value={prateleiraId} required readOnly />
+            </div>
+          )}
+
+          {/* Toggle adicionar/retirar */}
+          {activeTab === "relacionadas" && (
+            <div className="flex w-full mb-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 p-1 gap-1">
+              {[{ label: "Adicionar", value: "adicionar" }, { label: "Retirar", value: "retirar" }].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`flex-1 py-2 rounded-lg font-semibold transition text-sm ${
+                    tipo === opt.value
+                      ? "bg-amber-400 text-white shadow"
+                      : "bg-transparent text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  }`}
+                  onClick={() => setTipo(opt.value as "adicionar" | "retirar")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "naoRelacionadas" && (
+            <div className="flex w-full mb-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 p-1 gap-1">
+              <button
+                type="button"
+                className="flex-1 py-2 rounded-lg font-semibold transition text-sm bg-amber-400 text-white shadow"
+                onClick={() => setTipo("adicionar")}
+              >
+                Adicionar
+              </button>
+            </div>
+          )}
 
           {/* Quantidade */}
           {tipo === "adicionar" ? (
