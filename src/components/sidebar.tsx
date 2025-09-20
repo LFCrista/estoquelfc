@@ -1,8 +1,9 @@
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
-import { Home, Box, Clock, FileText, Users, Settings, Menu } from "lucide-react";
+import { Home, Box, Clock, Users,  Menu } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const menuItems = [
 	{ label: "Estoque", icon: Home, href: "/estoque" },
@@ -14,6 +15,15 @@ const menuItems = [
 
 export function Sidebar() {
 	const router = useRouter();
+	const [isAdmin, setIsAdmin] = useState(false);
+
+	useEffect(() => {
+		const role = document.cookie
+			.split("; ")
+			.find((row) => row.startsWith("role="))
+			?.split("=")[1];
+		setIsAdmin(role === "admin");
+	}, []);
 
 	const handleLogout = async () => {
 		try {
@@ -26,11 +36,6 @@ export function Sidebar() {
 			router.push("/login");
 		}
 	};
-
-	const isAdmin = document.cookie
-		.split("; ")
-		.find((row) => row.startsWith("role="))
-		?.split("=")[1] === "admin";
 
 	return (
 		<aside className="fixed top-0 left-0 h-screen w-64 bg-sidebar text-sidebar-foreground p-4 border-r border-sidebar-border z-40">

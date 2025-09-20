@@ -87,10 +87,7 @@ export default function HistoricoPage() {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleApplyFilters = () => {
-    setFilters((prev) => ({ ...prev, page: 1 }));
-  };
-
+  
   function renderQuantidade(acao: string, quantidade: number) {
     if (acao === "Adicionou Estoque") {
       return (
