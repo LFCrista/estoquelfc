@@ -86,6 +86,10 @@ export default function HistoricoPage() {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleApplyFilters = () => {
+    setFilters((prev) => ({ ...prev, page: 1 }));
+  };
+
   return (
     <div className="flex">
       <Sidebar />
@@ -95,22 +99,12 @@ export default function HistoricoPage() {
         <Card className="p-4 mb-6 w-full">{/* Ajuste para largura total */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">{/* Alteração para 4 colunas */}
             <div>
-              <Label htmlFor="startDate">Data Inicial</Label>
+              <Label htmlFor="date">Data</Label>
               <Input
                 type="date"
-                id="startDate"
-                name="startDate"
+                id="date"
+                name="startDate" // Corrigido para corresponder ao estado
                 value={filters.startDate}
-                onChange={handleFilterChange}
-              />
-            </div>
-            <div>
-              <Label htmlFor="endDate">Data Final</Label>
-              <Input
-                type="date"
-                id="endDate"
-                name="endDate"
-                value={filters.endDate}
                 onChange={handleFilterChange}
               />
             </div>
@@ -141,19 +135,21 @@ export default function HistoricoPage() {
                 className="w-full border border-gray-300 rounded-md p-2"
               >
                 <option value="">Todos</option>
-                <option value="Produtos">Produtos</option>
-                <option value="Prateleiras">Prateleiras</option>
-                <option value="Estoque">Estoque</option>
-                <option value="Usuários">Usuários</option>
+                <option value="produto">Produtos</option>
+                <option value="prateleira">Prateleiras</option>
+                <option value="estoque">Estoque</option>
+                <option value="user">Usuários</option>
               </select>
             </div>
           </div>
-          <Button
-            className="mt-4"
-            onClick={() => setFilters((prev) => ({ ...prev, page: 1 }))}
-          >
-            Aplicar Filtros
-          </Button>
+          {(filters.startDate || filters.user || filters.entidade) && (
+            <Button
+              className="mt-4"
+              onClick={() => setFilters({ startDate: "", endDate: "", user: "", entidade: "", page: 1, limit: 10 })}
+            >
+              Limpar Filtros
+            </Button>
+          )}
         </Card>
 
         <Card className="p-4 w-full">{/* Ajuste para largura total */}

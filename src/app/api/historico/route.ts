@@ -40,6 +40,8 @@ export async function GET(req: Request) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    const date = searchParams.get("startDate") || "";
+    const userId = searchParams.get("user_id") || "";
     const entidade = searchParams.get("entidade") || "";
     const acao = searchParams.get("acao") || "";
 
@@ -47,6 +49,16 @@ export async function GET(req: Request) {
       .from("historico")
       .select("id, user_id, entidade, entidade_id, acao, quantidade, created_at", { count: "exact" })
       .order("created_at", { ascending: false });
+
+    if (date) {
+      const startOfDay = new Date(`${date}T00:00:00`).toISOString();
+      const endOfDay = new Date(`${date}T23:59:59`).toISOString();
+      query = query.gte("created_at", startOfDay).lte("created_at", endOfDay); // Ajusta para considerar o fuso horário corretamente
+    }
+
+    if (userId) {
+      query = query.eq("user_id", userId);
+    }
 
     if (entidade) {
       query = query.eq("entidade", entidade);
