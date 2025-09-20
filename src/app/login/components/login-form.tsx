@@ -43,7 +43,9 @@ export function LoginForm({
       } else {
         console.log("Usuário logado:", data.user)
         // Salva o profileId no localStorage
-        localStorage.setItem("profileId", data.user.profileId);
+        localStorage.setItem("profileId", data.user.profileId)
+        // Salva o role nos cookies
+        document.cookie = `role=${data.user.role}; path=/;`
         // redireciona
         router.push("/estoque")
       }

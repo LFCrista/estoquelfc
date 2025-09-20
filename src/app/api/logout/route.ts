@@ -11,9 +11,13 @@ export async function POST() {
   // Invalida sessão no Supabase
   await supabase.auth.signOut();
 
-  // Remove cookie do navegador (auth-token ou supabase-auth-token)
+  // Remove cookies do navegador (auth-token e role)
   const response = NextResponse.json({ success: true });
   response.cookies.set("auth-token", "", {
+    expires: new Date(0),
+    path: "/",
+  });
+  response.cookies.set("role", "", {
     expires: new Date(0),
     path: "/",
   });
