@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
 import { Sidebar } from "@/components/sidebar";
+import { FaArrowUp, FaArrowDown } from "react-icons/fa"; // Importa os ícones de seta
 
 interface HistoricoItem {
   id: number;
@@ -90,6 +91,41 @@ export default function HistoricoPage() {
     setFilters((prev) => ({ ...prev, page: 1 }));
   };
 
+  function renderQuantidade(acao: string, quantidade: number) {
+    if (acao === "Adicionou Estoque") {
+      return (
+        <span className="text-green-500 flex items-center gap-1">
+          <FaArrowUp /> {quantidade}
+        </span>
+      );
+    } else if (acao === "Removeu Estoque") {
+      return (
+        <span className="text-red-500 flex items-center gap-1">
+          <FaArrowDown /> {quantidade}
+        </span>
+      );
+    }
+    return <span>{quantidade}</span>;
+  }
+
+  function renderAtualizacao(atualizacao: string) {
+    const [produto, prateleira] = atualizacao.split(" - "); // Separar produto e prateleira
+    return (
+      <span className="flex items-center gap-2">
+        {produto && (
+          <span className="bg-orange-100 text-orange-600 border border-orange-500 px-2 py-1 rounded-full text-sm">{produto}</span>
+        )}
+        
+        {prateleira && (
+          <>
+            <span>-</span>
+            <span className="bg-purple-100 text-purple-600 border border-purple-500 px-2 py-1 rounded-full text-sm">{prateleira}</span>
+          </>
+        )}
+      </span>
+    );
+  }
+
   return (
     <div className="flex">
       <Sidebar />
@@ -168,8 +204,8 @@ export default function HistoricoPage() {
                 <tr key={item.id}>
                   <td className="border border-gray-300 p-2">{item.quem}</td>
                   <td className="border border-gray-300 p-2">{item.acao}</td>
-                  <td className="border border-gray-300 p-2">{item.atualizacao}</td>
-                  <td className="border border-gray-300 p-2">{item.quantidade}</td>
+                  <td className="border border-gray-300 p-2">{renderAtualizacao(item.atualizacao)}</td>
+                  <td className="border border-gray-300 p-2">{renderQuantidade(item.acao, item.quantidade)}</td>
                   <td className="border border-gray-300 p-2">
                     {format(new Date(item.created_at), "dd/MM/yyyy HH:mm")}
                   </td>
