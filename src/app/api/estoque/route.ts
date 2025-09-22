@@ -154,7 +154,10 @@ export async function GET(req: Request) {
 
 		let query = supabase
 			.from("estoque")
-			.select("id, produto_id, quantidade, prateleira_id, produto:produto_id(nome), prateleira:prateleira_id(nome)", { count: "exact" })
+			.select(
+				"id, produto_id, quantidade, prateleira_id, produto:produto_id(nome, estoque_baixo), prateleira:prateleira_id(nome)",
+				{ count: "exact" }
+			)
 			.order("id", { ascending: true });
 
 		if (search) {

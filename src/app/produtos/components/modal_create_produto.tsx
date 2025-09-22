@@ -11,6 +11,7 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 	const [nome, setNome] = useState("");
 	const [SKU, setSKU] = useState("");
 	const [codBarras, setCodBarras] = useState("");
+	const [estoque_baixo, setEstoqueBaixo] = useState(0);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 			const res = await fetch("/api/produtos", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ nome, SKU, codBarras })
+				body: JSON.stringify({ nome, SKU, codBarras, estoque_baixo })
 			});
 			const data = await res.json();
 
@@ -65,6 +66,7 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 			setNome("");
 			setSKU("");
 			setCodBarras("");
+			setEstoqueBaixo(0);
 			onProdutoCreated();
 			onClose();
 		} catch (err) {
@@ -94,6 +96,16 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 					<div>
 						<label className="block text-sm font-medium mb-1">Código de Barras</label>
 						<input className="w-full border rounded px-3 py-2" value={codBarras} onChange={e => setCodBarras(e.target.value)} required />
+					</div>
+					<div>
+						<label className="block text-sm font-medium mb-1">Estoque Baixo</label>
+						<input
+							type="number"
+							className="w-full border rounded px-3 py-2"
+							value={estoque_baixo}
+							onChange={e => setEstoqueBaixo(Number(e.target.value))}
+							required
+						/>
 					</div>
 					{error && <div className="text-red-600 text-sm">{error}</div>}
 					<Button type="submit" disabled={saving}>{saving ? "Cadastrando..." : "Cadastrar"}</Button>

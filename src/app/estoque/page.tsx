@@ -12,6 +12,9 @@ interface Estoque {
 	quantidade: number;
 	produto?: {
 		nome: string;
+		SKU?: string;
+		codBarras?: string;
+		estoque_baixo?: number;
 	};
 	prateleira?: {
 		nome: string;
@@ -31,6 +34,9 @@ export default function EstoquePage() {
 	const [modalMoveOpen, setModalMoveOpen] = useState(false);
 	const [moveLivro, setMoveLivro] = useState<{ id: string; nome: string } | null>(null);
 	const [movePrateleiras, setMovePrateleiras] = useState<{ id: string; nome: string; quantidade: number }[]>([]);
+	const [totalLivros, setTotalLivros] = useState(0);
+	const [baixoEstoque, setBaixoEstoque] = useState(0);
+	const [semEstoque, setSemEstoque] = useState(0);
 
 	async function handleCreateEstoque(data: { produto_id: string; prateleira_id: string; quantidade: number }) {
 		await fetch("/api/estoque", {
@@ -52,8 +58,45 @@ export default function EstoquePage() {
 		});
 		const res = await fetch(`/api/estoque?${params}`);
 		const data = await res.json();
+		console.log("Dados retornados pela API:", data);
 		setEstoque(data.estoque || []);
 		setTotal(data.total || 0);
+
+		// Group quantities by product
+		const produtoQuantidades = data.estoque.reduce((acc: Record<string, { quantidadeTotal: number; estoqueBaixo: number }>, item: Estoque) => {
+			if (!acc[item.produto_id]) {
+				acc[item.produto_id] = {
+					quantidadeTotal: 0,
+					estoqueBaixo: item.produto?.estoque_baixo || 0,
+				};
+			}
+			acc[item.produto_id].quantidadeTotal += item.quantidade;
+			return acc;
+		}, {});
+
+		console.log("Produto Quantidades:", produtoQuantidades);
+
+		// Calculate dynamic card values
+		const produtosComEstoque = Object.keys(produtoQuantidades);
+		const baixoEstoque = produtosComEstoque.filter((produtoId) => {
+			const { quantidadeTotal, estoqueBaixo } = produtoQuantidades[produtoId];
+			console.log(`Produto ID: ${produtoId}, Quantidade Total: ${quantidadeTotal}, Estoque Baixo: ${estoqueBaixo}`);
+			if (estoqueBaixo === undefined || estoqueBaixo === null) {
+				console.warn(`Produto ${produtoId} não possui estoque_baixo definido.`);
+				return false;
+			}
+			if (quantidadeTotal <= estoqueBaixo) {
+				console.log(`Produto ${produtoId} é considerado baixo estoque.`);
+				return true;
+			}
+			return false;
+		}).length;
+		const semEstoque = produtosComEstoque.filter((produtoId) => produtoQuantidades[produtoId].quantidadeTotal === 0).length;
+
+		setTotalLivros(produtosComEstoque.length);
+		setBaixoEstoque(baixoEstoque);
+		setSemEstoque(semEstoque);
+
 		setLoading(false);
 	}
 
@@ -64,11 +107,6 @@ export default function EstoquePage() {
 	useEffect(() => {
 		fetchEstoque({ page, search, searchField });
 	}, [page, search, searchField]);
-
-	const totalLivros = 57;
-	const produtosDiferentes = 2;
-	const baixoEstoque = 0;
-	const semEstoque = 0;
 
 		// Agrupar estoques por produto
 		const agrupado = estoque.reduce((acc, item) => {
@@ -106,19 +144,19 @@ export default function EstoquePage() {
 					{/* Cards de resumo */}
 					<div className="flex gap-4 mb-8">
 						<div className="flex-1 rounded-lg border border-border bg-card p-6 flex flex-col justify-center shadow">
-							<span className="text-sm text-muted-foreground">Total de Livros</span>
+							<span className="text-sm text-muted-foreground">Total de Produtos com Estoque</span>
 							<span className="text-3xl font-bold text-amber-400">{totalLivros}</span>
-							<span className="text-xs text-muted-foreground mt-1">em {produtosDiferentes} produtos diferentes</span>
+							<span className="text-xs text-muted-foreground mt-1">produtos com estoque criado</span>
 						</div>
 						<div className="flex-1 rounded-lg border border-yellow-900 bg-card p-6 flex flex-col justify-center shadow">
 							<span className="text-sm text-muted-foreground">Baixo Estoque</span>
 							<span className="text-3xl font-bold text-yellow-400">{baixoEstoque}</span>
-							<span className="text-xs text-muted-foreground mt-1">produtos com menos de 10 unidades</span>
+							<span className="text-xs text-muted-foreground mt-1">produtos com estoque abaixo do limite</span>
 						</div>
 						<div className="flex-1 rounded-lg border border-red-900 bg-card p-6 flex flex-col justify-center shadow">
 							<span className="text-sm text-muted-foreground">Sem Estoque</span>
 							<span className="text-3xl font-bold text-red-400">{semEstoque}</span>
-							<span className="text-xs text-muted-foreground mt-1">produtos esgotados</span>
+							<span className="text-xs text-muted-foreground mt-1">produtos sem estoque</span>
 						</div>
 					</div>
 					<div className="rounded-lg shadow bg-card p-6">

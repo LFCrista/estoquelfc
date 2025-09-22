@@ -6,25 +6,28 @@ interface Produto {
 	nome: string;
 	SKU: string;
 	codBarras: string;
+	estoque_baixo: number;
 }
 
 interface ModalEditProdutoProps {
 	isOpen: boolean;
 	onClose: () => void;
 	produto: Produto | null;
-	onSave: (produto: { id: string; nome: string; SKU: string; codBarras: string }) => void;
+	onSave: (produto: { id: string; nome: string; SKU: string; codBarras: string; estoque_baixo: number }) => void;
 }
 
 export function ModalEditProduto({ isOpen, onClose, produto, onSave }: ModalEditProdutoProps) {
 	const [nome, setNome] = useState(produto?.nome || "");
 	const [SKU, setSKU] = useState(produto?.SKU || "");
 	const [codBarras, setCodBarras] = useState(produto?.codBarras || "");
+	const [estoque_baixo, setEstoqueBaixo] = useState(produto?.estoque_baixo || 0);
 	const [saving, setSaving] = useState(false);
 
 	React.useEffect(() => {
 		setNome(produto?.nome || "");
 		setSKU(produto?.SKU || "");
 		setCodBarras(produto?.codBarras || "");
+		setEstoqueBaixo(produto?.estoque_baixo || 0);
 	}, [produto]);
 
 	if (!isOpen || !produto) return null;
@@ -37,10 +40,11 @@ export function ModalEditProduto({ isOpen, onClose, produto, onSave }: ModalEdit
 		if (nome !== produto.nome) changes.push("Alterou nome do produto");
 		if (SKU !== produto.SKU) changes.push("Alterou SKU do produto");
 		if (codBarras !== produto.codBarras) changes.push("Alterou código de barras do produto");
+		if (estoque_baixo !== produto.estoque_baixo) changes.push("Alterou estoque baixo do produto");
 
 		const action = changes.join(", ");
 
-		await onSave({ id: produto.id, nome, SKU, codBarras });
+		await onSave({ id: produto.id, nome, SKU, codBarras, estoque_baixo });
 
 		try {
 			const userId = localStorage.getItem("profileId");
@@ -106,6 +110,16 @@ export function ModalEditProduto({ isOpen, onClose, produto, onSave }: ModalEdit
 								className="w-full border rounded px-3 py-2"
 								value={codBarras}
 								onChange={e => setCodBarras(e.target.value)}
+								required
+							/>
+						</div>
+						<div>
+							<label className="block text-sm font-medium mb-1">Estoque Baixo</label>
+							<input
+								type="number"
+								className="w-full border rounded px-3 py-2"
+								value={estoque_baixo}
+								onChange={e => setEstoqueBaixo(Number(e.target.value))}
 								required
 							/>
 						</div>

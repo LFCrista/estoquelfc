@@ -12,6 +12,7 @@ interface Produto {
   nome: string;
   SKU: string;
   codBarras: string;
+  estoque_baixo: number;
 }
 
 
