@@ -150,23 +150,29 @@ export async function GET(req: Request) {
 
 		// Filtros opcionais
 		const search = searchParams.get("search")?.trim() || "";
-		const searchField = searchParams.get("searchField") || "produto_id";
+		const searchField = searchParams.get("searchField") || "produto.nome";
 
 		let query = supabase
 			.from("estoque")
 			.select(
-				"id, produto_id, quantidade, prateleira_id, produto:produto_id(nome, estoque_baixo), prateleira:prateleira_id(nome)",
+				"id, produto_id, quantidade, prateleira_id, produto:produto_id(nome, SKU, codBarras, estoque_baixo), prateleira:prateleira_id(nome)",
 				{ count: "exact" }
 			)
 			.order("id", { ascending: true });
 
 		if (search) {
-			if (["produto_id", "prateleira_id"].includes(searchField)) {
-				// Busca exata para campos numéricos
-				query = query.eq(searchField, isNaN(Number(search)) ? search : Number(search));
-			} else {
-				// Busca textual para outros campos
+			if (["produto.nome", "produto.SKU", "produto.codBarras"].includes(searchField)) {
+				// Busca textual para campos relacionados
 				query = query.ilike(searchField, `%${search}%`);
+			} else if (["produto_id", "prateleira_id"].includes(searchField)) {
+				// Verifica se o valor é numérico antes de aplicar o filtro
+				const numericSearch = Number(search);
+				if (!isNaN(numericSearch)) {
+					query = query.eq(searchField, numericSearch);
+				} else {
+					console.warn(`Valor inválido para campo numérico: ${search}`);
+					return NextResponse.json({ error: "Valor inválido para campo numérico" }, { status: 400 });
+				}
 			}
 		}
 
@@ -178,8 +184,29 @@ export async function GET(req: Request) {
 			console.error("Erro ao buscar estoque (GET):", error);
 			return NextResponse.json({ error: error.message }, { status: 400 });
 		}
-		console.log("GET /api/estoque", { total: count, dataLength: data?.length });
-		return NextResponse.json({ estoque: data, total: count });
+
+		// Define explicit types for data and item.produto
+		type EstoqueItem = {
+			produto: {
+				nome: string;
+				SKU?: string;
+				codBarras?: string;
+				estoque_baixo?: number;
+			} | null;
+			[key: string]: any;
+		};
+
+		// Filtra itens sem nome de produto
+		const filteredData = (data as unknown as EstoqueItem[]).filter((item) => {
+			if (Array.isArray(item.produto)) {
+				console.error("Erro: Produto retornado como array inesperado.");
+				return false; // Ignora itens com estrutura inesperada
+			}
+			return item.produto?.nome;
+		});
+
+		console.log("GET /api/estoque", { total: count, dataLength: filteredData?.length });
+		return NextResponse.json({ estoque: filteredData, total: count });
 	} catch (err) {
 		console.error("Erro inesperado no GET /api/estoque:", err);
 		return NextResponse.json({ error: "Erro interno" }, { status: 500 });
