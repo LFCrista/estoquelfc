@@ -53,6 +53,29 @@ export default function EstoquePage() {
   const [stockFilter, setStockFilter] = useState("Todos");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Ref para input de arquivo CSV
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Handler para upload do CSV de estoque
+  async function handleEstoqueCSVUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/estoque/import-csv', {
+      method: 'POST',
+      body: formData
+    });
+    if (res.ok) {
+      alert('Estoque importado com sucesso!');
+      await fetchEstoque({ page, search, searchField, stockFilter });
+    } else {
+      const data = await res.json();
+      alert('Erro ao importar estoque: ' + (data?.error || 'Erro desconhecido.'));
+    }
+    e.target.value = '';
+  }
+
   // Função para criar estoque
   async function handleCreateEstoque(data: { produto_id: string; prateleira_id: string; quantidade: number }) {
     await fetch("/api/estoque", {
@@ -234,19 +257,35 @@ export default function EstoquePage() {
         <div className="rounded-lg shadow bg-card p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Controle de Estoque</h2>
-            <button
-              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2 transition"
-              onClick={() => setModalCreateOpen(true)}
-            >
-              <span className="text-lg font-bold">+</span> Adicionar Estoque
-            </button>
-            {modalCreateOpen && (
-              <ModalCreateEstoque
-                isOpen={modalCreateOpen}
-                onClose={() => setModalCreateOpen(false)}
-                onEstoqueCreated={handleCreateEstoque}
+            <div className="flex gap-2">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2 transition"
+                onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                type="button"
+              >
+                <span className="text-lg font-bold">⬆</span> Importar Estoque CSV
+              </button>
+              <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleEstoqueCSVUpload}
               />
-            )}
+              <button
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2 transition"
+                onClick={() => setModalCreateOpen(true)}
+              >
+                <span className="text-lg font-bold">+</span> Adicionar Estoque
+              </button>
+              {modalCreateOpen && (
+                <ModalCreateEstoque
+                  isOpen={modalCreateOpen}
+                  onClose={() => setModalCreateOpen(false)}
+                  onEstoqueCreated={handleCreateEstoque}
+                />
+              )}
+            </div>
           </div>
 
           <table className="w-full border-collapse text-sm">
