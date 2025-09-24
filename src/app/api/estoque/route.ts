@@ -210,8 +210,10 @@ export async function GET(req: Request) {
 
 		console.log("GET /api/estoque", { total: count, dataLength: filteredData?.length });
 		return NextResponse.json({ estoque: filteredData, total: count });
-	} catch (err) {
-		console.error("Erro inesperado no GET /api/estoque:", err);
-		return NextResponse.json({ error: "Erro interno" }, { status: 500 });
-	}
+		} catch (err: unknown) {
+			let message = "Erro interno";
+			if (err instanceof Error) message = err.message;
+			console.error("Erro inesperado no GET /api/estoque:", err);
+			return NextResponse.json({ error: message }, { status: 500 });
+		}
 }

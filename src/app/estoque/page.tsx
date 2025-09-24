@@ -1,5 +1,5 @@
 "use client";
-import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "../../components/sidebar";
 import { Pagination } from "../../components/ui/pagination";
 import { ModalCreateEstoque } from "./components/modal_create_estoque";
@@ -173,7 +173,16 @@ export default function EstoquePage() {
   }, [page, search, searchField, stockFilter]);
 
   // Agrupa estoque por produto
-  const agrupado = estoque.reduce((acc, item) => {
+  type AgrupadoItem = {
+    id: string;
+    produto_id: string;
+    nome: string;
+    prateleiras: { nome: string; quantidade: number }[];
+    distribuidores: string[];
+    quantidadeTotal: number;
+    estoqueBaixo: number;
+  };
+  const agrupado = estoque.reduce<Record<string, AgrupadoItem>>((acc, item) => {
     const key = item.produto_id;
     if (!acc[key]) {
       acc[key] = {
@@ -190,8 +199,8 @@ export default function EstoquePage() {
     acc[key].distribuidores.push(item.distribuidor?.nome || item.distribuidor_id);
     acc[key].quantidadeTotal += item.quantidade;
     return acc;
-  }, {} as Record<string, any>);
-  const agrupadoArr = Object.values(agrupado);
+  }, {});
+  const agrupadoArr: AgrupadoItem[] = Object.values(agrupado);
 
   // Função para definir cor do nome e quantidade
   const getCorEstoque = (item: typeof agrupadoArr[0]) => {
@@ -307,7 +316,7 @@ export default function EstoquePage() {
               ) : agrupadoArr.length === 0 ? (
                 <tr><td colSpan={8} className="p-4 text-center">Nenhum item de estoque encontrado.</td></tr>
               ) : (
-                agrupadoArr.map(item => (
+                agrupadoArr.map((item: AgrupadoItem) => (
                   <tr key={item.produto_id} className="border-b border-border hover:bg-secondary/40 transition">
                     <td className="p-2 font-mono text-xs font-bold">{item.id}</td>
                     <td className={`p-2 ${getCorEstoque(item)}`}>{item.nome}</td>

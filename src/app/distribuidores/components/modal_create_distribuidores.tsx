@@ -24,9 +24,9 @@ export function ModalCreateDistribuidor({ isOpen, onClose, onDistribuidorCreated
 						setError(null);
 
 						try {
-							const { distribuidorId } = await onDistribuidorCreated({ nome });
-							setNome("");
-							onClose();
+													await onDistribuidorCreated({ nome });
+													setNome("");
+													onClose();
 						} catch (err) {
 							console.error("Erro inesperado ao cadastrar distribuidor:", err);
 							setError("Erro inesperado ao cadastrar distribuidor");

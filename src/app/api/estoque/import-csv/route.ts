@@ -80,7 +80,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     return NextResponse.json({ message: `Importação concluída. ${estoqueToInsert.length} itens importados.` });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Erro desconhecido." }, { status: 500 });
+  } catch (err: unknown) {
+    let message = "Erro desconhecido.";
+    if (err instanceof Error) message = err.message;
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
