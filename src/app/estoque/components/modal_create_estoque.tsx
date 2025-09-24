@@ -12,6 +12,11 @@ interface Prateleira {
   nome: string;
 }
 
+interface Distribuidor {
+  id: string;
+  nome: string;
+}
+
 interface ModalCreateEstoqueProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,6 +37,8 @@ export function ModalCreateEstoque({
   const [produtoId, setProdutoId] = useState("");
   const [prateleiraId, setPrateleiraId] = useState("");
   const [quantidade, setQuantidade] = useState(1);
+  const [distribuidorId, setDistribuidorId] = useState("");
+  const [distribuidores, setDistribuidores] = useState<Distribuidor[]>([]);
 
   // Produto search
   const [search, setSearch] = useState("");
@@ -45,6 +52,11 @@ export function ModalCreateEstoque({
   const [prateleiraSearch, setPrateleiraSearch] = useState("");
   const [showPrateleiraDropdown, setShowPrateleiraDropdown] = useState(false);
   const prateleiraInputRef = useRef<HTMLInputElement>(null);
+
+  // Distribuidor search
+  const [distribuidorSearch, setDistribuidorSearch] = useState("");
+  const [showDistribuidorDropdown, setShowDistribuidorDropdown] = useState(false);
+  const distribuidorInputRef = useRef<HTMLInputElement>(null);
 
   // Busca produtos
   useEffect(() => {
@@ -109,6 +121,33 @@ export function ModalCreateEstoque({
     };
   }, [prateleiraSearch]);
 
+  // Busca distribuidores
+  useEffect(() => {
+    if (distribuidorSearch.trim().length < 2) {
+      setDistribuidores([]);
+      setShowDistribuidorDropdown(false);
+      return;
+    }
+    let ignore = false;
+    async function fetchDistribuidores() {
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "20",
+        search: distribuidorSearch.trim(),
+      });
+      const res = await fetch(`/api/distribuidores?${params}`);
+      const data = await res.json();
+      if (!ignore) {
+        setDistribuidores(data.distribuidores || []);
+        setShowDistribuidorDropdown(true);
+      }
+    }
+    fetchDistribuidores();
+    return () => {
+      ignore = true;
+    };
+  }, [distribuidorSearch]);
+
   if (!isOpen) return null;
 
   return (
@@ -126,19 +165,13 @@ export function ModalCreateEstoque({
           onSubmit={async (e) => {
             e.preventDefault();
             try {
-              const userId = localStorage.getItem("profileId");
-
-              if (!userId) {
-                alert("User ID não encontrado no localStorage.");
-                return;
-              }
-
               const res = await fetch("/api/estoque", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   produto_id: produtoId,
                   prateleira_id: prateleiraId,
+                  distribuidor_id: distribuidorId,
                   quantidade,
                 }),
               });
@@ -153,6 +186,13 @@ export function ModalCreateEstoque({
 
               if (!estoqueId) {
                 alert("ID do estoque não retornado pela API.");
+                return;
+              }
+
+              const userId = localStorage.getItem("profileId");
+
+              if (!userId) {
+                alert("User ID não encontrado no localStorage.");
                 return;
               }
 
@@ -178,6 +218,7 @@ export function ModalCreateEstoque({
 
               setProdutoId("");
               setPrateleiraId("");
+              setDistribuidorId("");
               setQuantidade(1);
               onEstoqueCreated({ produto_id: produtoId, prateleira_id: prateleiraId, quantidade });
               onClose();
@@ -302,6 +343,46 @@ export function ModalCreateEstoque({
               </ul>
             )}
             <input type="hidden" value={prateleiraId} required readOnly />
+          </div>
+
+          {/* Distribuidor */}
+          <div className="relative">
+            <label className="block text-sm font-medium mb-1">Distribuidor</label>
+            <input
+              ref={distribuidorInputRef}
+              type="text"
+              placeholder="Pesquisar distribuidor..."
+              className="border border-border rounded px-3 py-2 bg-background text-foreground w-full focus:outline-none focus:ring-2 focus:ring-amber-500"
+              value={distribuidorSearch}
+              onChange={(e) => {
+                setDistribuidorSearch(e.target.value);
+                setShowDistribuidorDropdown(true);
+              }}
+              onFocus={() => {
+                if (distribuidores.length > 0) setShowDistribuidorDropdown(true);
+              }}
+              autoComplete="off"
+            />
+            {showDistribuidorDropdown && distribuidores.length > 0 && (
+              <ul className="absolute left-0 top-full mt-1 border rounded bg-white dark:bg-zinc-900 max-h-48 overflow-y-auto shadow z-[999] w-full">
+                {distribuidores.map((dist) => (
+                  <li
+                    key={dist.id}
+                    className={`px-3 py-2 cursor-pointer hover:bg-amber-100 dark:hover:bg-zinc-800 ${
+                      distribuidorId === dist.id ? "bg-amber-50 dark:bg-zinc-800" : ""
+                    }`}
+                    onClick={() => {
+                      setDistribuidorId(dist.id);
+                      setDistribuidorSearch(dist.nome);
+                      setShowDistribuidorDropdown(false);
+                    }}
+                  >
+                    {dist.nome}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <input type="hidden" value={distribuidorId} required readOnly />
           </div>
 
           {/* Quantidade */}

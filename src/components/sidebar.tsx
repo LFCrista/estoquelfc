@@ -11,6 +11,7 @@ const menuItems = [
 	{ label: "Prateleiras", icon: Box, href: "/prateleiras" },
 	{ label: "Histórico", icon: Clock, href: "/historico", adminOnly: true },
 	{ label: "Usuários", icon: Users, href: "/users", adminOnly: true },
+	{ label: "Distribuidores", icon: Box, href: "/distribuidores" },
 ];
 
 export function Sidebar() {

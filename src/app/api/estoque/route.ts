@@ -8,14 +8,15 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
 	try {
-		const { produto_id, prateleira_id, quantidade } = await req.json();
-		console.log("POST /api/estoque", { produto_id, prateleira_id, quantidade });
-		// Verifica se já existe estoque para o mesmo produto e prateleira
+		const { produto_id, prateleira_id, distribuidor_id, quantidade } = await req.json();
+		console.log("POST /api/estoque", { produto_id, prateleira_id, distribuidor_id, quantidade });
+		// Verifica se já existe estoque para o mesmo produto, prateleira e distribuidor
 		const { data: existing, error: findError } = await supabase
 			.from("estoque")
 			.select("id, quantidade")
 			.eq("produto_id", produto_id)
 			.eq("prateleira_id", prateleira_id)
+			.eq("distribuidor_id", distribuidor_id)
 			.maybeSingle();
 
 		if (findError) {
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
 			// Cria novo item
 			const { data: newEstoque, error } = await supabase
 				.from("estoque")
-				.insert([{ produto_id, prateleira_id, quantidade }])
+				.insert([{ produto_id, prateleira_id, distribuidor_id, quantidade }])
 				.select("id")
 				.single();
 			if (error) {
@@ -57,17 +58,18 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
 	try {
-		const { id, produto_id, prateleira_id, tipo, quantidade } = await req.json();
-		console.log("PATCH /api/estoque", { id, produto_id, prateleira_id, tipo, quantidade });
+		const { id, produto_id, prateleira_id, distribuidor_id, tipo, quantidade } = await req.json();
+		console.log("PATCH /api/estoque", { id, produto_id, prateleira_id, distribuidor_id, tipo, quantidade });
 
 		// Se for movimentação de estoque (adicionar/retirar)
-		if (tipo && quantidade !== undefined && produto_id && prateleira_id) {
+		if (tipo && quantidade !== undefined && produto_id && prateleira_id && distribuidor_id) {
 			// Busca o estoque atual
 			const { data: estoque, error: findError } = await supabase
 				.from("estoque")
 				.select("id, quantidade")
 				.eq("produto_id", produto_id)
 				.eq("prateleira_id", prateleira_id)
+				.eq("distribuidor_id", distribuidor_id)
 				.maybeSingle();
 
 			if (findError) {
@@ -79,7 +81,7 @@ export async function PATCH(req: Request) {
 					// Cria novo estoque
 					const { error } = await supabase
 						.from("estoque")
-						.insert([{ produto_id, prateleira_id, quantidade }]);
+						.insert([{ produto_id, prateleira_id, distribuidor_id, quantidade }]);
 					if (error) {
 						console.error("Erro ao criar novo estoque na movimentação:", error);
 						return NextResponse.json({ error: error.message }, { status: 400 });
@@ -115,20 +117,21 @@ export async function PATCH(req: Request) {
 			return NextResponse.json({ message: "Movimentação realizada com sucesso" });
 		}
 
-		// Caso contrário, apenas edita produto/prateleira
-		if (id && (produto_id || prateleira_id)) {
+		// Caso contrário, apenas edita produto/prateleira/distribuidor
+		if (id && (produto_id || prateleira_id || distribuidor_id)) {
 			const updateData: Record<string, string | number> = {};
 			if (produto_id) updateData.produto_id = produto_id;
 			if (prateleira_id) updateData.prateleira_id = prateleira_id;
+			if (distribuidor_id) updateData.distribuidor_id = distribuidor_id;
 			const { error } = await supabase
 				.from("estoque")
 				.update(updateData)
 				.eq("id", id);
 			if (error) {
-				console.error("Erro ao atualizar produto/prateleira:", error);
+				console.error("Erro ao atualizar produto/prateleira/distribuidor:", error);
 				return NextResponse.json({ error: error.message }, { status: 400 });
 			}
-			console.log("Estoque atualizado com sucesso (produto/prateleira)");
+			console.log("Estoque atualizado com sucesso (produto/prateleira/distribuidor)");
 			return NextResponse.json({ message: "Estoque atualizado com sucesso" });
 		}
 
@@ -155,7 +158,7 @@ export async function GET(req: Request) {
 		let query = supabase
 			.from("estoque")
 			.select(
-				"id, produto_id, quantidade, prateleira_id, produto:produto_id(nome, SKU, codBarras, estoque_baixo), prateleira:prateleira_id(nome)",
+				"id, produto_id, quantidade, prateleira_id, distribuidor_id, produto:produto_id(nome, SKU, codBarras, estoque_baixo), prateleira:prateleira_id(nome), distribuidor:distribuidor_id(nome)",
 				{ count: "exact" }
 			)
 			.order("id", { ascending: true });

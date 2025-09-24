@@ -3,12 +3,14 @@ import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEf
 import { Sidebar } from "../../components/sidebar";
 import { Pagination } from "../../components/ui/pagination";
 import { ModalCreateEstoque } from "./components/modal_create_estoque";
+import { ModalEditEstoque } from "./components/modal_edit_estoque";
 import { ModalMoveEstoque } from "./components/modal_move_estoque";
 
 interface Estoque {
   id: string;
   produto_id: string;
   prateleira_id: string;
+  distribuidor_id: string; // Adicionado
   quantidade: number;
   produto?: {
     nome: string;
@@ -17,6 +19,9 @@ interface Estoque {
     estoque_baixo?: number;
   };
   prateleira?: {
+    nome: string;
+  };
+  distribuidor?: { // Adicionado
     nome: string;
   };
 }
@@ -32,9 +37,16 @@ export default function EstoquePage() {
   const [total, setTotal] = useState(0);
   const perPage = 100;
   const [modalCreateOpen, setModalCreateOpen] = useState(false);
+  const [modalEditOpen, setModalEditOpen] = useState(false);
   const [modalMoveOpen, setModalMoveOpen] = useState(false);
   const [moveLivro, setMoveLivro] = useState<{ id: string; nome: string } | null>(null);
   const [movePrateleiras, setMovePrateleiras] = useState<{ id: string; nome: string; quantidade: number }[]>([]);
+  const [moveEstoqueData, setMoveEstoqueData] = useState<{
+    produtoId: string;
+    prateleiraId: string;
+    distribuidorId: string;
+    quantidadeAtual: number;
+  } | null>(null);
   const [totalLivros, setTotalLivros] = useState(0);
   const [baixoEstoque, setBaixoEstoque] = useState(0);
   const [semEstoque, setSemEstoque] = useState(0);
@@ -146,11 +158,13 @@ export default function EstoquePage() {
         produto_id: item.produto_id,
         nome: item.produto?.nome || item.produto_id,
         prateleiras: [],
+        distribuidores: [],
         quantidadeTotal: 0,
         estoqueBaixo: item.produto?.estoque_baixo || 0
       };
     }
     acc[key].prateleiras.push({ nome: item.prateleira?.nome || item.prateleira_id, quantidade: item.quantidade });
+    acc[key].distribuidores.push(item.distribuidor?.nome || item.distribuidor_id);
     acc[key].quantidadeTotal += item.quantidade;
     return acc;
   }, {} as Record<string, any>);
@@ -241,39 +255,74 @@ export default function EstoquePage() {
                 <th className="p-2 text-left font-semibold">ID</th>
                 <th className="p-2 text-left font-semibold">Nome do Livro</th>
                 <th className="p-2 text-left font-semibold">Prateleiras</th>
+                <th className="p-2 text-left font-semibold">Distribuidor</th>
                 <th className="p-2 text-left font-semibold">Qtd. em cada</th>
-                <th className="p-2 text-left font-semibold">Qtd. Total</th>
+                 <th className="p-2 text-left font-semibold">Mover</th>
+                 <th className="p-2 text-left font-semibold">Qtd. Total</th>
                 <th className="p-2 text-left font-semibold">Ação</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="p-4 text-center">Carregando...</td></tr>
+                <tr><td colSpan={8} className="p-4 text-center">Carregando...</td></tr>
               ) : agrupadoArr.length === 0 ? (
-                <tr><td colSpan={6} className="p-4 text-center">Nenhum item de estoque encontrado.</td></tr>
+                <tr><td colSpan={8} className="p-4 text-center">Nenhum item de estoque encontrado.</td></tr>
               ) : (
                 agrupadoArr.map(item => (
                   <tr key={item.produto_id} className="border-b border-border hover:bg-secondary/40 transition">
                     <td className="p-2 font-mono text-xs font-bold">{item.id}</td>
                     <td className={`p-2 ${getCorEstoque(item)}`}>{item.nome}</td>
                     <td className="p-2">
-                      {item.prateleiras.map((p: { nome: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, idx: Key | null | undefined) => (
+                      {item.prateleiras.map((p: { nome: string }, idx: number) => (
                         <div key={idx} className="mb-1">
                           <span className="inline-block px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-semibold mr-1">{p.nome}</span>
                         </div>
                       ))}
                     </td>
                     <td className="p-2">
-                      {item.prateleiras.map((p: { quantidade: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }, idx: Key | null | undefined) => (
+                      {item.distribuidores.map((d: string, idx: number) => (
+                        <div key={idx} className="mb-1">
+                          <span className="inline-block px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-semibold mr-1">{d}</span>
+                        </div>
+                      ))}
+                    </td>
+                    <td className="p-2">
+                      {item.prateleiras.map((p: { quantidade: number }, idx: number) => (
                         <div key={idx} className="mb-1">
                           <span className="inline-block px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold mr-1">{p.quantidade}</span>
                         </div>
                       ))}
                     </td>
+                    <td className="p-2 text-center">
+                      {estoque
+                        .filter(e => e.produto_id === item.produto_id)
+                        .map((e, idx) => (
+                          <button
+                            key={idx}
+                            className="transition flex items-center justify-center w-6 h-6 rounded-full border border-orange-500 bg-orange-100 hover:bg-orange-200 hover:border-orange-600 mb-1"
+                            onClick={() => {
+                              setMoveEstoqueData({
+                                produtoId: e.produto_id,
+                                prateleiraId: e.prateleira_id,
+                                distribuidorId: e.distribuidor_id,
+                                quantidadeAtual: e.quantidade,
+                              });
+                              setModalMoveOpen(true);
+                            }}
+                            title="Mover"
+                          >
+                            {/* Heroicons ArrowsRightLeft */}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.7} stroke="#ea580c" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 8.25H4.75m0 0l3-3m-3 3l3 3m-3 6.75h11.75m0 0l-3 3m3-3l-3-3" />
+                            </svg>
+                          </button>
+                        ))}
+                    </td>
                     <td className={`p-2 font-bold text-lg ${getCorEstoque(item)}`}>{item.quantidadeTotal}</td>
                     <td className="p-2">
-                      <span
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold text-xs cursor-pointer hover:bg-amber-200 transition"
+                      <button
+                        className="flex items-center justify-center w-9 h-9 rounded-full bg-orange-200 hover:bg-orange-300 transition border border-orange-300 shadow cursor-pointer"
+                        title="Movimentar"
                         onClick={() => {
                           setMoveLivro({ id: item.produto_id, nome: item.nome });
                           setMovePrateleiras(
@@ -283,11 +332,14 @@ export default function EstoquePage() {
                               quantidade: e.quantidade
                             }))
                           );
-                          setModalMoveOpen(true);
+                          setModalEditOpen(true);
                         }}
                       >
-                        Movimentar
-                      </span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="w-6 h-6">
+                          <circle cx="12" cy="12" r="11" fill="#fdba74" fillOpacity="0.7" />
+                          <path d="M12 7v10M7 12h10" stroke="#ea580c" strokeWidth="2.2" strokeLinecap="round" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -297,15 +349,45 @@ export default function EstoquePage() {
           <Pagination page={page} total={total} perPage={perPage} onPageChange={setPage} />
         </div>
 
-        {modalMoveOpen && moveLivro && (
-          <ModalMoveEstoque
-            isOpen={modalMoveOpen}
-            onClose={() => setModalMoveOpen(false)}
+        {modalEditOpen && moveLivro && (
+          <ModalEditEstoque
+            isOpen={modalEditOpen}
+            onClose={() => setModalEditOpen(false)}
             livro={moveLivro}
             prateleiras={movePrateleiras}
             onSubmit={async () => {
-              setModalMoveOpen(false);
+              setModalEditOpen(false);
               await fetchEstoque({ page, search, searchField, stockFilter });
+            }}
+          />
+        )}
+
+        {modalMoveOpen && moveEstoqueData && (
+          <ModalMoveEstoque
+            isOpen={modalMoveOpen}
+            onClose={() => setModalMoveOpen(false)}
+            produtoId={moveEstoqueData.produtoId}
+            prateleiraId={moveEstoqueData.prateleiraId}
+            distribuidorId={moveEstoqueData.distribuidorId}
+            quantidadeAtual={moveEstoqueData.quantidadeAtual}
+            estoqueId={
+              estoque.find(e =>
+                e.produto_id === moveEstoqueData.produtoId &&
+                e.prateleira_id === moveEstoqueData.prateleiraId &&
+                e.distribuidor_id === moveEstoqueData.distribuidorId
+              )?.id
+            }
+            produtoNome={estoque.find(e => e.produto_id === moveEstoqueData.produtoId)?.produto?.nome || "Produto desconhecido"}
+            prateleiraNome={estoque.find(e => e.prateleira_id === moveEstoqueData.prateleiraId)?.prateleira?.nome || "Prateleira desconhecida"}
+            distribuidorNome={estoque.find(e => e.distribuidor_id === moveEstoqueData.distribuidorId)?.distribuidor?.nome || "Distribuidor desconhecido"}
+            onSubmit={async () => {
+              try {
+                await fetchEstoque({ page, search, searchField, stockFilter });
+              } catch (err) {
+                console.error("Erro inesperado ao atualizar lista de estoque:", err);
+              } finally {
+                setModalMoveOpen(false);
+              }
             }}
           />
         )}
