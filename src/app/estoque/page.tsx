@@ -321,7 +321,7 @@ export default function EstoquePage() {
                     <td className="p-2 font-mono text-xs font-bold">{item.id}</td>
                     <td className={`p-2 ${getCorEstoque(item)}`}>{item.nome}</td>
                     <td className="p-2">
-                      {item.prateleiras.map((p: { nome: string }, idx: number) => (
+                      {item.prateleiras.map((p: { nome: string; quantidade: number }, idx: number) => (
                         <div key={idx} className="mb-1">
                           <span className="inline-block px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-700 text-xs font-semibold mr-1">{p.nome}</span>
                         </div>

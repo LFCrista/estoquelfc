@@ -196,7 +196,7 @@ export async function GET(req: Request) {
 				codBarras?: string;
 				estoque_baixo?: number;
 			} | null;
-			[key: string]: any;
+			[key: string]: unknown;
 		};
 
 		// Filtra itens sem nome de produto
