@@ -77,6 +77,45 @@ export default function EstoquePage() {
     e.target.value = '';
   }
 
+  // Handler para exportar estoque para Excel
+  function handleExportToExcel() {
+    // Prepara os dados para exportação
+    const exportData = agrupadoArr.map(item => ({
+      'Nome do Produto': item.nome,
+      'Prateleiras': item.prateleiras.map(p => p.nome).join(', '),
+      'Distribuidores': item.distribuidores.join(', '),
+      'Quantidade Total': item.quantidadeTotal
+    }));
+
+    // Converte para CSV (compatible com Excel)
+    const headers = Object.keys(exportData[0] || {});
+    const csvContent = [
+      headers.join(','),
+      ...exportData.map(row => 
+        headers.map(header => {
+          const value = row[header as keyof typeof row];
+          // Escapa aspas e envolve em aspas se contém vírgula
+          const stringValue = String(value || '');
+          if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        }).join(',')
+      )
+    ].join('\n');
+
+    // Cria e baixa o arquivo
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `estoque_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // Função para criar estoque
   async function handleCreateEstoque(data: { produto_id: string; prateleira_id: string; quantidade: number }) {
     await fetch("/api/estoque", {
@@ -282,6 +321,13 @@ export default function EstoquePage() {
                 style={{ display: 'none' }}
                 onChange={handleEstoqueCSVUpload}
               />
+              <button
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2 transition"
+                onClick={handleExportToExcel}
+                type="button"
+              >
+                <span className="text-lg font-bold">⬇</span> Exportar Excel
+              </button>
               <button
                 className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded flex items-center gap-2 transition"
                 onClick={() => setModalCreateOpen(true)}
