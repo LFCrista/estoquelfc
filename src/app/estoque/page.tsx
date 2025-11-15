@@ -79,22 +79,30 @@ export default function EstoquePage() {
 
   // Handler para exportar estoque para Excel
   function handleExportToExcel() {
+    // Define as colunas na ordem correta
+    const headers = ['Nome do Produto', 'SKU', 'Prateleiras', 'Distribuidores', 'Quantidade Total'];
+    
     // Prepara os dados para exportação
-    const exportData = agrupadoArr.map(item => ({
-      'Nome do Produto': item.nome,
-      'Prateleiras': item.prateleiras.map(p => p.nome).join(', '),
-      'Distribuidores': item.distribuidores.join(', '),
-      'Quantidade Total': item.quantidadeTotal
-    }));
+    const exportData = agrupadoArr.map(item => {
+      // Encontra o primeiro estoque deste produto para obter SKU
+      const estoqueItem = estoque.find(e => e.produto_id === item.produto_id);
+      
+      return {
+        'Nome do Produto': item.nome || '',
+        'SKU': estoqueItem?.produto?.SKU || '',
+        'Prateleiras': item.prateleiras.map(p => p.nome).join(', ') || '',
+        'Distribuidores': item.distribuidores.join(', ') || '',
+        'Quantidade Total': item.quantidadeTotal || 0
+      };
+    });
 
     // Converte para CSV (compatible com Excel)
-    const headers = Object.keys(exportData[0] || {});
     const csvContent = [
       headers.join(','),
       ...exportData.map(row => 
         headers.map(header => {
           const value = row[header as keyof typeof row];
-          // Escapa aspas e envolve em aspas se contém vírgula
+          // Escapa aspas e envolve em aspas se contém vírgula, quebra de linha ou aspas
           const stringValue = String(value || '');
           if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
             return `"${stringValue.replace(/"/g, '""')}"`;
