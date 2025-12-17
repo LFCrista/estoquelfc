@@ -79,6 +79,30 @@ export default function RomaneioPage() {
     inputRef.current?.focus();
   }, []);
 
+  // comparator implementing rules: A asc, B desc, C asc, D desc. Use scan order as tie-breaker, then quantity
+  const makeShelfComparator = useCallback((scanOrder: string[]) => {
+    const groupOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+    const scanIndex = (id: string) => {
+      const idx = scanOrder.indexOf(id);
+      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+    };
+    return (a: StockEntry | { prateleira_nome?: string; prateleira_id?: string; quantidade?: number }, b: StockEntry | { prateleira_nome?: string; prateleira_id?: string; quantidade?: number }) => {
+      const nameA = ("prateleira" in a ? (a.prateleira?.nome || a.prateleira_nome || '') : (a.prateleira_nome || '')).toString();
+      const nameB = ("prateleira" in b ? (b.prateleira?.nome || b.prateleira_nome || '') : (b.prateleira_nome || '')).toString();
+      const parsedA = parseShelfName(nameA);
+      const parsedB = parseShelfName(nameB);
+      const orderA = groupOrder[parsedA.group] ?? 99;
+      const orderB = groupOrder[parsedB.group] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      const asc = parsedA.group === 'A' || parsedA.group === 'C';
+      if (parsedA.num !== parsedB.num) return asc ? parsedA.num - parsedB.num : parsedB.num - parsedA.num;
+      const pa = scanIndex(a.prateleira_id || ("prateleira" in a ? a.prateleira?.id || '' : ''));
+      const pb = scanIndex(b.prateleira_id || ("prateleira" in b ? b.prateleira?.id || '' : ''));
+      if (pa !== pb) return pa - pb;
+      return (b.quantidade || 0) - (a.quantidade || 0);
+    };
+  }, []);
+
   // Generate romaneio allocations (same logic used earlier)
   const computeAllocations = useCallback(async (currentItems?: ItemPicking[]) => {
     const itemsToUse = currentItems || items;
@@ -361,35 +385,8 @@ export default function RomaneioPage() {
     if (!match) return { group: '', num: 0 };
     return { group: match[1], num: match[2] ? parseInt(match[2], 10) : 0 };
   }
-
-  // comparator implementing rules: A asc, B desc, C asc, D desc. Use scan order as tie-breaker, then quantity
-  function makeShelfComparator(scanOrder: string[]) {
-    const groupOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
-    const scanIndex = (id: string) => {
-      const idx = scanOrder.indexOf(id);
-      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
-    };
-    return (a: StockEntry | { prateleira_nome?: string; prateleira_id?: string; quantidade?: number }, b: StockEntry | { prateleira_nome?: string; prateleira_id?: string; quantidade?: number }) => {
-      const nameA = ("prateleira" in a ? (a.prateleira?.nome || a.prateleira_nome || '') : (a.prateleira_nome || '')).toString();
-      const nameB = ("prateleira" in b ? (b.prateleira?.nome || b.prateleira_nome || '') : (b.prateleira_nome || '')).toString();
-      const parsedA = parseShelfName(nameA);
-      const parsedB = parseShelfName(nameB);
-      const orderA = groupOrder[parsedA.group] ?? 99;
-      const orderB = groupOrder[parsedB.group] ?? 99;
-      if (orderA !== orderB) return orderA - orderB;
-      // same group -> apply asc/desc depending on group
-      const asc = parsedA.group === 'A' || parsedA.group === 'C';
-      if (parsedA.num !== parsedB.num) return asc ? parsedA.num - parsedB.num : parsedB.num - parsedA.num;
-      // tie-breaker: use scan order of prateleira_id
-      const pa = scanIndex((a as any).prateleira_id || ("prateleira" in a ? a.prateleira?.id || '' : ''));
-      const pb = scanIndex((b as any).prateleira_id || ("prateleira" in b ? b.prateleira?.id || '' : ''));
-      if (pa !== pb) return pa - pb;
-      // final tie-breaker: prefer shelf with more quantity
-      return (b.quantidade || 0) - (a.quantidade || 0);
-    };
-  }
-
-
+  
+  
   // Trigger allocation recomputation and open romaneio view
   async function handleGerarRomaneio() {
     await computeAllocations();
