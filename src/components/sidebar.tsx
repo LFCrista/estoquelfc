@@ -1,12 +1,13 @@
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
-import { Home, Box, Clock, Users,  Menu } from "lucide-react";
+import { Home, Box, Clock, Users, Menu, FileText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const menuItems = [
 	{ label: "Estoque", icon: Home, href: "/estoque" },
+	{ label: "Picking", icon: FileText, href: "/picking" },
 	{ label: "Produtos", icon: Box, href: "/produtos" },
 	{ label: "Prateleiras", icon: Box, href: "/prateleiras" },
 	{ label: "Histórico", icon: Clock, href: "/historico", adminOnly: true },

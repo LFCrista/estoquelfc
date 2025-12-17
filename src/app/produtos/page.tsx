@@ -13,6 +13,7 @@ interface Produto {
   SKU: string;
   codBarras: string;
   estoque_baixo: number;
+  quantidade_caixa?: number;
 }
 
 
@@ -56,7 +57,7 @@ export default function ProdutosPage() {
     e.target.value = '';
   }
 
-  async function handleSaveEditProduto(updated: { id: string; nome: string; SKU: string; codBarras: string }) {
+  async function handleSaveEditProduto(updated: { id: string; nome: string; SKU: string; codBarras: string; quantidade_caixa?: number; estoque_baixo?: number }) {
     await fetch("/api/produtos", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

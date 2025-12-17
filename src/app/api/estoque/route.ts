@@ -158,15 +158,52 @@ export async function GET(req: Request) {
 		let query = supabase
 			.from("estoque")
 			.select(
-				"id, produto_id, quantidade, prateleira_id, distribuidor_id, produto:produto_id(nome, SKU, codBarras, estoque_baixo), prateleira:prateleira_id(nome), distribuidor:distribuidor_id(nome)",
+				"id, produto_id, quantidade, prateleira_id, distribuidor_id, produto:produto_id(nome, SKU, codBarras, estoque_baixo, quantidade_caixa), prateleira:prateleira_id(nome), distribuidor:distribuidor_id(nome)",
 				{ count: "exact" }
 			)
 			.order("id", { ascending: true });
 
 		if (search) {
-			if (["produto.nome", "produto.SKU", "produto.codBarras"].includes(searchField)) {
-				// Busca textual para campos relacionados
-				query = query.ilike(searchField, `%${search}%`);
+			if (searchField === "produto.codBarras") {
+				// Para código de barras, buscar primeiro na tabela produtos
+				const { data: produtos } = await supabase
+					.from("produtos")
+					.select("id")
+					.ilike("codBarras", `%${search}%`);
+				
+				if (produtos && produtos.length > 0) {
+					const produtoIds = produtos.map(p => p.id);
+					query = query.in("produto_id", produtoIds);
+				} else {
+					// Se não encontrou produtos, retornar vazio
+					return NextResponse.json({ estoque: [], total: 0 });
+				}
+			} else if (searchField === "produto.nome") {
+				// Para nome do produto
+				const { data: produtos } = await supabase
+					.from("produtos")
+					.select("id")
+					.ilike("nome", `%${search}%`);
+				
+				if (produtos && produtos.length > 0) {
+					const produtoIds = produtos.map(p => p.id);
+					query = query.in("produto_id", produtoIds);
+				} else {
+					return NextResponse.json({ estoque: [], total: 0 });
+				}
+			} else if (searchField === "produto.SKU") {
+				// Para SKU do produto
+				const { data: produtos } = await supabase
+					.from("produtos")
+					.select("id")
+					.ilike("SKU", `%${search}%`);
+				
+				if (produtos && produtos.length > 0) {
+					const produtoIds = produtos.map(p => p.id);
+					query = query.in("produto_id", produtoIds);
+				} else {
+					return NextResponse.json({ estoque: [], total: 0 });
+				}
 			} else if (["produto_id", "prateleira_id"].includes(searchField)) {
 				// Verifica se o valor é numérico antes de aplicar o filtro
 				const numericSearch = Number(search);

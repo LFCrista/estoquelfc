@@ -77,16 +77,11 @@ export default function EstoquePage() {
     e.target.value = '';
   }
 
-  // Handler para exportar estoque para Excel
   function handleExportToExcel() {
-    // Define as colunas na ordem correta
     const headers = ['Nome do Produto', 'SKU', 'Prateleiras', 'Distribuidores', 'Quantidade Total'];
-    
-    // Prepara os dados para exportação
+
     const exportData = agrupadoArr.map(item => {
-      // Encontra o primeiro estoque deste produto para obter SKU
       const estoqueItem = estoque.find(e => e.produto_id === item.produto_id);
-      
       return {
         'Nome do Produto': item.nome || '',
         'SKU': estoqueItem?.produto?.SKU || '',
@@ -96,14 +91,12 @@ export default function EstoquePage() {
       };
     });
 
-    // Converte para CSV (compatible com Excel)
     const csvContent = [
       headers.join(','),
-      ...exportData.map(row => 
+      ...exportData.map(row =>
         headers.map(header => {
           const value = row[header as keyof typeof row];
-          // Escapa aspas e envolve em aspas se contém vírgula, quebra de linha ou aspas
-          const stringValue = String(value || '');
+          const stringValue = String(value ?? '');
           if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
             return `"${stringValue.replace(/"/g, '""')}"`;
           }
@@ -112,7 +105,6 @@ export default function EstoquePage() {
       )
     ].join('\n');
 
-    // Cria e baixa o arquivo
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);

@@ -12,6 +12,7 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 	const [SKU, setSKU] = useState("");
 	const [codBarras, setCodBarras] = useState("");
 	const [estoque_baixo, setEstoqueBaixo] = useState(0);
+	const [quantidade_caixa, setQuantidade_caixa] = useState(1);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +32,7 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 			const res = await fetch("/api/produtos", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ nome, SKU, codBarras, estoque_baixo })
+				body: JSON.stringify({ nome, SKU, codBarras, estoque_baixo, quantidade_caixa })
 			});
 			const data = await res.json();
 
@@ -67,6 +68,7 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 			setSKU("");
 			setCodBarras("");
 			setEstoqueBaixo(0);
+			setQuantidade_caixa(1);
 			onProdutoCreated();
 			onClose();
 		} catch (err) {
@@ -104,6 +106,17 @@ export function ModalCreateProduto({ isOpen, onClose, onProdutoCreated }: ModalC
 							className="w-full border rounded px-3 py-2"
 							value={estoque_baixo}
 							onChange={e => setEstoqueBaixo(Number(e.target.value))}
+							required
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium mb-1">Quantidade por Caixa</label>
+						<input
+							type="number"
+							min={1}
+							className="w-full border rounded px-3 py-2"
+							value={quantidade_caixa}
+							onChange={e => setQuantidade_caixa(Number(e.target.value))}
 							required
 						/>
 					</div>

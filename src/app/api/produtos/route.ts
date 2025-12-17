@@ -7,10 +7,10 @@ const supabase = createClient(
 );
 
 export async function POST(req: Request) {
-  const { nome, SKU, codBarras, estoque_baixo } = await req.json();
+  const { nome, SKU, codBarras, estoque_baixo, quantidade_caixa } = await req.json();
   const { data: produtoData, error } = await supabase
     .from("produtos")
-    .insert([{ nome, SKU, codBarras, estoque_baixo }])
+    .insert([{ nome, SKU, codBarras, estoque_baixo, quantidade_caixa }])
     .select("id")
     .single();
 
@@ -22,10 +22,10 @@ export async function POST(req: Request) {
   });
 }
 export async function PATCH(req: Request) {
-  const { id, nome, SKU, codBarras, estoque_baixo } = await req.json();
+  const { id, nome, SKU, codBarras, estoque_baixo, quantidade_caixa } = await req.json();
   const { error } = await supabase
     .from("produtos")
-    .update({ nome, SKU, codBarras, estoque_baixo })
+    .update({ nome, SKU, codBarras, estoque_baixo, quantidade_caixa })
     .eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ message: "Produto atualizado com sucesso" });
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from("produtos")
-    .select("id, nome, SKU, codBarras, estoque_baixo", { count: "exact" })
+    .select("id, nome, SKU, codBarras, estoque_baixo, quantidade_caixa", { count: "exact" })
     .order("nome", { ascending: true });
 
   if (search) {
