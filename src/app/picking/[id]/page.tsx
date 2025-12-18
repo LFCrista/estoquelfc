@@ -38,6 +38,7 @@ interface StockEntry {
   prateleira_nome?: string;
   quantidade?: number;
   produto?: { nome?: string; SKU?: string; quantidade_caixa?: number };
+  distribuidor_id?: number | string;
 }
 
 interface Allocation {
@@ -81,12 +82,12 @@ export default function RomaneioPage() {
   function scheduleFocus() {
     try {
       const doFocus = () => {
-        try { (document.activeElement as HTMLElement | null)?.blur(); } catch (_) {}
-        try { inputRef.current?.focus(); inputRef.current?.select(); } catch (_) {}
+        try { (document.activeElement as HTMLElement | null)?.blur(); } catch { /* ignore */ }
+        try { inputRef.current?.focus(); inputRef.current?.select(); } catch { /* ignore */ }
       };
       if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doFocus);
       else setTimeout(doFocus, 50);
-    } catch (_) {}
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
@@ -171,14 +172,14 @@ export default function RomaneioPage() {
             .sort(shelfComparator);
           const single = candidatesSingle[0];
           if (single) {
-            allocations.push({ prateleira_id: single.prateleira_id, prateleira_nome: (single as StockEntry).prateleira?.nome || single.prateleira_nome || "Sem prateleira", units: unitsNeeded, distribuidor_id: (single as any).distribuidor_id });
+            allocations.push({ prateleira_id: single.prateleira_id, prateleira_nome: single.prateleira?.nome || single.prateleira_nome || "Sem prateleira", units: unitsNeeded, distribuidor_id: single.distribuidor_id });
           } else {
             const sorted = [...entries].sort(shelfComparator);
             let remain = unitsNeeded;
             for (const e of sorted) {
               if (remain <= 0) break;
               const take = Math.min(remain, e.quantidade || 0);
-              if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: (e as StockEntry).prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: (e as any).distribuidor_id });
+              if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: e.prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: e.distribuidor_id });
               remain -= take;
             }
           }
@@ -189,7 +190,7 @@ export default function RomaneioPage() {
           for (const e of sorted) {
             if (remain <= 0) break;
             const take = Math.min(remain, e.quantidade || 0);
-            if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: (e as StockEntry).prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: (e as any).distribuidor_id });
+            if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: e.prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: e.distribuidor_id });
             remain -= take;
           }
         }
@@ -201,7 +202,7 @@ export default function RomaneioPage() {
         }
       }
 
-      let rotas = Object.keys(rotaMap).map((pid) => ({ prateleira: rotaMap[pid].prateleira_nome || pid, items: rotaMap[pid].items }));
+      const rotas = Object.keys(rotaMap).map((pid) => ({ prateleira: rotaMap[pid].prateleira_nome || pid, items: rotaMap[pid].items }));
       // sort rotas according to shelf rules A asc, B desc, C asc, D desc
       function parseShelfNameLocal(name?: string) {
         if (!name) return { group: '', num: 0 };
@@ -235,7 +236,7 @@ export default function RomaneioPage() {
           const prodId = it.produto_id;
           if (!allocationsByProd[prodId]) allocationsByProd[prodId] = [];
           // try to find distribuidor from entriesResults
-          const allocFromEntries = entriesResults.flatMap((r: any) => r.estoque || []).find((e: any) => String(e.produto_id) === String(prodId) && String(e.prateleira_id) === String(prId));
+          const allocFromEntries = entriesResults.flatMap((r: { estoque?: StockEntry[] }) => r.estoque || []).find((e: StockEntry) => String(e.produto_id) === String(prodId) && String(e.prateleira_id) === String(prId));
           allocationsByProd[prodId].push({ prateleira_id: prId, prateleira_nome: pr.prateleira_nome, boxes: it.boxes, units: it.units, insufficient: !!it.insufficient, distribuidor_id: allocFromEntries ? allocFromEntries.distribuidor_id : undefined });
         }
       }
@@ -368,12 +369,12 @@ export default function RomaneioPage() {
       setLoading(false);
       try {
         const doFocus = () => {
-          try { (document.activeElement as HTMLElement | null)?.blur(); } catch (_) {}
-          try { inputRef.current?.focus(); inputRef.current?.select(); } catch (_) {}
+          try { (document.activeElement as HTMLElement | null)?.blur(); } catch { /* ignore */ }
+          try { inputRef.current?.focus(); inputRef.current?.select(); } catch { /* ignore */ }
         };
         if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doFocus);
         else setTimeout(doFocus, 50);
-      } catch (_) {}
+      } catch { /* ignore */ }
     }
   }
 
@@ -462,7 +463,7 @@ export default function RomaneioPage() {
         const alList = allocationsMap[prodId] || [];
         for (const alloc of alList) {
           try {
-            const body: any = { produto_id: prodId, prateleira_id: alloc.prateleira_id, tipo: 'retirar', quantidade: alloc.units };
+            const body: { produto_id: string; prateleira_id: string; tipo: string; quantidade: number; distribuidor_id?: number | string } = { produto_id: prodId, prateleira_id: alloc.prateleira_id, tipo: 'retirar', quantidade: alloc.units };
             if (alloc.distribuidor_id) {
               body.distribuidor_id = alloc.distribuidor_id;
             } else {
@@ -470,7 +471,7 @@ export default function RomaneioPage() {
               const r = await fetch(`/api/estoque?searchField=produto_id&search=${encodeURIComponent(String(prodId))}&page=1&limit=100`);
               if (r.ok) {
                 const d = await r.json();
-                const found = (d.estoque || []).find((e: any) => String(e.prateleira_id) === String(alloc.prateleira_id));
+                const found = (d.estoque || []).find((e: StockEntry) => String(e.prateleira_id) === String(alloc.prateleira_id));
                 if (found) body.distribuidor_id = found.distribuidor_id;
               }
             }
