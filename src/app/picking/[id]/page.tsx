@@ -46,6 +46,7 @@ interface Allocation {
   boxes: number;
   units: number;
   insufficient?: boolean;
+  distribuidor_id?: number | string;
 }
 
 interface RotaOtimizadaItem {
@@ -64,6 +65,7 @@ export default function RomaneioPage() {
 
   const [romaneio, setRomaneio] = useState<Romaneio | null>(null);
   const [items, setItems] = useState<ItemPicking[]>([]);
+  const itemsRef = useRef<ItemPicking[]>(items);
   const [codBarras, setCodBarras] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRomaneio, setShowRomaneio] = useState(false);
@@ -73,11 +75,27 @@ export default function RomaneioPage() {
   const [allocationsMap, setAllocationsMap] = useState<Record<string, Allocation[]>>({});
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const computingRef = useRef(false);
   // removed unused isSyncingRef
+
+  function scheduleFocus() {
+    try {
+      const doFocus = () => {
+        try { (document.activeElement as HTMLElement | null)?.blur(); } catch (_) {}
+        try { inputRef.current?.focus(); inputRef.current?.select(); } catch (_) {}
+      };
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doFocus);
+      else setTimeout(doFocus, 50);
+    } catch (_) {}
+  }
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   // comparator implementing rules: A asc, B desc, C asc, D desc. Use scan order as tie-breaker, then quantity
   const makeShelfComparator = useCallback((scanOrder: string[]) => {
@@ -105,13 +123,15 @@ export default function RomaneioPage() {
 
   // Generate romaneio allocations (same logic used earlier)
   const computeAllocations = useCallback(async (currentItems?: ItemPicking[]) => {
-    const itemsToUse = currentItems || items;
+    const itemsToUse = currentItems || itemsRef.current;
     if (!itemsToUse || itemsToUse.length === 0) {
       setRotaOtimizada([]);
       setInsufficientWarnings([]);
       return;
     }
 
+    if (computingRef.current) return; // avoid concurrent computations
+    computingRef.current = true;
     setLoading(true);
     try {
       const byProduct: Record<string, { boxes: number; produto_nome: string; produto_sku: string; quantidade_caixa: number }> = {};
@@ -126,33 +146,39 @@ export default function RomaneioPage() {
       const rotaMap: Record<string, { prateleira_nome: string; items: RotaOtimizadaItem[] }> = {};
       const warnings: string[] = [];
 
-      for (const produtoId of Object.keys(byProduct)) {
+      // fetch estoque for all products in parallel
+      const produtoIds = Object.keys(byProduct);
+      const entriesResults = await Promise.all(produtoIds.map((produtoId) => {
+        const params = new URLSearchParams({ searchField: "produto_id", search: String(produtoId), page: "1", limit: "100" });
+        return fetch(`/api/estoque?${params.toString()}`).then(r => r.json()).catch(() => ({ estoque: [] }));
+      }));
+
+      for (let i = 0; i < produtoIds.length; i++) {
+        const produtoId = produtoIds[i];
         const info = byProduct[produtoId];
         const boxesNeeded = info.boxes;
         const unitsNeeded = boxesNeeded * (info.quantidade_caixa || 1);
 
-        const params = new URLSearchParams({ searchField: "produto_id", search: String(produtoId), page: "1", limit: "100" });
-        const res = await fetch(`/api/estoque?${params.toString()}`);
-        const data: { estoque?: StockEntry[] } = await res.json();
+        const data: { estoque?: StockEntry[] } = entriesResults[i] || { estoque: [] };
         const entries: StockEntry[] = data.estoque || [];
 
         const totalAvailable = entries.reduce((s: number, e: StockEntry) => s + (e.quantidade || 0), 0);
 
-        const allocations: Array<{ prateleira_id: string; prateleira_nome: string; units: number }> = [];
+        const allocations: Array<{ prateleira_id: string; prateleira_nome: string; units: number; distribuidor_id?: number | string }> = [];
 
         if (totalAvailable >= unitsNeeded) {
           const candidatesSingle = entries.filter((e: StockEntry) => (e.quantidade || 0) >= unitsNeeded)
             .sort(shelfComparator);
           const single = candidatesSingle[0];
           if (single) {
-            allocations.push({ prateleira_id: single.prateleira_id, prateleira_nome: (single as StockEntry).prateleira?.nome || single.prateleira_nome || "Sem prateleira", units: unitsNeeded });
+            allocations.push({ prateleira_id: single.prateleira_id, prateleira_nome: (single as StockEntry).prateleira?.nome || single.prateleira_nome || "Sem prateleira", units: unitsNeeded, distribuidor_id: (single as any).distribuidor_id });
           } else {
             const sorted = [...entries].sort(shelfComparator);
             let remain = unitsNeeded;
             for (const e of sorted) {
               if (remain <= 0) break;
               const take = Math.min(remain, e.quantidade || 0);
-              if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: (e as StockEntry).prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take });
+              if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: (e as StockEntry).prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: (e as any).distribuidor_id });
               remain -= take;
             }
           }
@@ -163,7 +189,7 @@ export default function RomaneioPage() {
           for (const e of sorted) {
             if (remain <= 0) break;
             const take = Math.min(remain, e.quantidade || 0);
-            if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: (e as StockEntry).prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take });
+            if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: (e as StockEntry).prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: (e as any).distribuidor_id });
             remain -= take;
           }
         }
@@ -175,7 +201,26 @@ export default function RomaneioPage() {
         }
       }
 
-      const rotas = Object.keys(rotaMap).map((pid) => ({ prateleira: rotaMap[pid].prateleira_nome || pid, items: rotaMap[pid].items }));
+      let rotas = Object.keys(rotaMap).map((pid) => ({ prateleira: rotaMap[pid].prateleira_nome || pid, items: rotaMap[pid].items }));
+      // sort rotas according to shelf rules A asc, B desc, C asc, D desc
+      function parseShelfNameLocal(name?: string) {
+        if (!name) return { group: '', num: 0 };
+        const trimmed = name.trim().toUpperCase();
+        const match = trimmed.match(/^([A-Z])(\d+)?/);
+        if (!match) return { group: '', num: 0 };
+        return { group: match[1], num: match[2] ? parseInt(match[2], 10) : 0 };
+      }
+      const groupOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+      rotas.sort((a, b) => {
+        const pa = parseShelfNameLocal(a.prateleira);
+        const pb = parseShelfNameLocal(b.prateleira);
+        const oa = groupOrder[pa.group] ?? 99;
+        const ob = groupOrder[pb.group] ?? 99;
+        if (oa !== ob) return oa - ob;
+        const asc = pa.group === 'A' || pa.group === 'C';
+        if (pa.num !== pb.num) return asc ? pa.num - pb.num : pb.num - pa.num;
+        return a.prateleira.localeCompare(b.prateleira);
+      });
 
       if (rotas.length === 0) {
         setRotaOtimizada(otimizarRota(itemsToUse));
@@ -189,7 +234,9 @@ export default function RomaneioPage() {
         for (const it of pr.items) {
           const prodId = it.produto_id;
           if (!allocationsByProd[prodId]) allocationsByProd[prodId] = [];
-          allocationsByProd[prodId].push({ prateleira_id: prId, prateleira_nome: pr.prateleira_nome, boxes: it.boxes, units: it.units, insufficient: !!it.insufficient });
+          // try to find distribuidor from entriesResults
+          const allocFromEntries = entriesResults.flatMap((r: any) => r.estoque || []).find((e: any) => String(e.produto_id) === String(prodId) && String(e.prateleira_id) === String(prId));
+          allocationsByProd[prodId].push({ prateleira_id: prId, prateleira_nome: pr.prateleira_nome, boxes: it.boxes, units: it.units, insufficient: !!it.insufficient, distribuidor_id: allocFromEntries ? allocFromEntries.distribuidor_id : undefined });
         }
       }
 
@@ -198,7 +245,9 @@ export default function RomaneioPage() {
       setRotaOtimizada(rotas.length === 0 ? otimizarRota(itemsToUse) : rotas);
 
       if (warnings.length > 0) {
-        setInsufficientWarnings(warnings);
+        // dedupe warnings
+        const uniqueWarnings = Array.from(new Set(warnings));
+        setInsufficientWarnings(uniqueWarnings);
         setShowInsufficientModal(true);
       } else {
         setInsufficientWarnings([]);
@@ -208,8 +257,9 @@ export default function RomaneioPage() {
       console.error(err);
     } finally {
       setLoading(false);
+      computingRef.current = false;
     }
-  }, [items, makeShelfComparator]);
+  }, [makeShelfComparator]);
 
   const carregarRomaneio = useCallback(async () => {
     setLoading(true);
@@ -311,12 +361,19 @@ export default function RomaneioPage() {
       }
 
       setCodBarras("");
-      inputRef.current?.focus();
     } catch (err) {
       console.error(err);
       alert("Erro ao buscar produto");
     } finally {
       setLoading(false);
+      try {
+        const doFocus = () => {
+          try { (document.activeElement as HTMLElement | null)?.blur(); } catch (_) {}
+          try { inputRef.current?.focus(); inputRef.current?.select(); } catch (_) {}
+        };
+        if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doFocus);
+        else setTimeout(doFocus, 50);
+      } catch (_) {}
     }
   }
 
@@ -400,6 +457,38 @@ export default function RomaneioPage() {
     }
     setLoading(true);
     try {
+      // Retirar itens do estoque conforme allocationsMap
+      for (const prodId of Object.keys(allocationsMap)) {
+        const alList = allocationsMap[prodId] || [];
+        for (const alloc of alList) {
+          try {
+            const body: any = { produto_id: prodId, prateleira_id: alloc.prateleira_id, tipo: 'retirar', quantidade: alloc.units };
+            if (alloc.distribuidor_id) {
+              body.distribuidor_id = alloc.distribuidor_id;
+            } else {
+              // try to find distribuidor_id from estoque
+              const r = await fetch(`/api/estoque?searchField=produto_id&search=${encodeURIComponent(String(prodId))}&page=1&limit=100`);
+              if (r.ok) {
+                const d = await r.json();
+                const found = (d.estoque || []).find((e: any) => String(e.prateleira_id) === String(alloc.prateleira_id));
+                if (found) body.distribuidor_id = found.distribuidor_id;
+              }
+            }
+
+            if (!body.distribuidor_id) {
+              console.warn('Distribuidor não encontrado para retirada', prodId, alloc.prateleira_id);
+              continue;
+            }
+
+            const r2 = await fetch('/api/estoque', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!r2.ok) {
+              console.warn('Falha ao retirar estoque para', prodId, alloc.prateleira_id, await r2.text());
+            }
+          } catch (err) {
+            console.error('Erro ao processar retirada de estoque', err);
+          }
+        }
+      }
       const res = await fetch("/api/picking", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: romaneio.id, status: "concluido" }) });
       if (!res.ok) {
         const err = await res.json();
@@ -436,8 +525,8 @@ export default function RomaneioPage() {
           <div className="bg-white p-6 rounded-lg shadow mb-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><Barcode className="w-5 h-5" /> Bipar Produtos</h2>
             <div className="flex gap-2">
-              <Input ref={inputRef} type="text" placeholder="Código de barras..." value={codBarras} onChange={(e) => setCodBarras(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleScan(); }} className="flex-1" disabled={loading} />
-              <Button onClick={handleScan} disabled={loading || !codBarras.trim()}>{loading ? 'Buscando...' : 'Adicionar'}</Button>
+              <Input ref={inputRef} type="text" placeholder="Código de barras..." value={codBarras} onChange={(e) => setCodBarras(e.target.value)} onKeyDown={async (e) => { if (e.key === 'Enter') { e.preventDefault(); await handleScan(); scheduleFocus(); } }} className="flex-1" disabled={loading} />
+              <Button onMouseDown={(e) => e.preventDefault()} onClick={async () => { await handleScan(); scheduleFocus(); }} disabled={loading || !codBarras.trim()}>{loading ? 'Buscando...' : 'Adicionar'}</Button>
             </div>
           </div>
 
@@ -495,7 +584,7 @@ export default function RomaneioPage() {
             )}
           </div>
 
-          {items.length > 0 && <div className="flex justify-end gap-2"><Button onClick={handleGerarRomaneio} className="bg-blue-600 hover:bg-blue-700"><FileText className="w-4 h-4 mr-2" /> Gerar Romaneio</Button></div>}
+          {items.length > 0 && <div className="flex justify-end gap-2"><Button onClick={handleGerarRomaneio} disabled={loading} className="bg-blue-600 hover:bg-blue-700">{loading ? <><FileText className="w-4 h-4 mr-2" /> Gerando...</> : <><FileText className="w-4 h-4 mr-2" /> Gerar Romaneio</>}</Button></div>}
 
           {showRomaneio && (
             <div className="bg-white p-6 rounded-lg shadow mb-6">

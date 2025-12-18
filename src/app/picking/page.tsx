@@ -37,6 +37,15 @@ interface RotaOtimizada {
   }>;
 }
 
+interface Allocation {
+  prateleira_id: string;
+  prateleira_nome: string;
+  boxes: number;
+  units: number;
+  insufficient?: boolean;
+  distribuidor_id?: number | string;
+}
+
 export default function PickingPage() {
   const [tela, setTela] = useState<"selecao" | "bipagem" | "romaneio">("selecao");
   const [romaneios, setRomaneios] = useState<Romaneio[]>([]);
@@ -45,6 +54,7 @@ export default function PickingPage() {
   const [novoRomaneioDescricao, setNovoRomaneioDescricao] = useState("");
   const [codBarras, setCodBarras] = useState("");
   const [items, setItems] = useState<ItemPicking[]>([]);
+  const itemsRef = useRef<ItemPicking[]>(items);
   const [loading, setLoading] = useState(false);
   const [rotaOtimizada, setRotaOtimizada] = useState<RotaOtimizada[]>([]);
   const [showInsufficientModal, setShowInsufficientModal] = useState(false);
@@ -52,6 +62,19 @@ export default function PickingPage() {
   const [showRomaneio, setShowRomaneio] = useState(false);
   const [mostrarFormNovo, setMostrarFormNovo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const computingRef = useRef(false);
+  const [allocationsMap, setAllocationsMap] = useState<Record<string, Allocation[]>>({});
+
+  function scheduleFocus() {
+    try {
+      const doFocus = () => {
+        try { (document.activeElement as HTMLElement | null)?.blur(); } catch (_) {}
+        try { inputRef.current?.focus(); inputRef.current?.select(); } catch (_) {}
+      };
+      if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doFocus);
+      else setTimeout(doFocus, 50);
+    } catch (_) {}
+  }
 
   // Carregar romaneios ao iniciar
   useEffect(() => {
@@ -65,13 +88,17 @@ export default function PickingPage() {
     }
   }, [tela, showRomaneio]);
 
-  // Carregar lista de romaneios pendentes/em andamento
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  // Carregar lista de romaneios pendentes/em andamento/concluidos
   async function carregarRomaneios() {
     try {
       const res = await fetch("/api/picking");
       const data = await res.json();
-      const roms = (data.data || []).filter((r: Romaneio) => 
-        r.status === "pendente" || r.status === "em_andamento"
+      const roms = (data.data || []).filter((r: Romaneio) =>
+        r.status === "pendente" || r.status === "em_andamento" || r.status === "concluido"
       );
       setRomaneios(roms);
     } catch (err) {
@@ -211,12 +238,19 @@ export default function PickingPage() {
       }
 
       setCodBarras("");
-      inputRef.current?.focus();
     } catch (err) {
       console.error("Erro ao buscar produto:", err);
       alert("Erro ao buscar produto");
     } finally {
       setLoading(false);
+      try {
+        const doFocus = () => {
+          try { (document.activeElement as HTMLElement | null)?.blur(); } catch (_) {}
+          try { inputRef.current?.focus(); inputRef.current?.select(); } catch (_) {}
+        };
+        if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doFocus);
+        else setTimeout(doFocus, 50);
+      } catch (_) {}
     }
   }
 
@@ -260,21 +294,26 @@ export default function PickingPage() {
     }, {} as Record<string, RotaOtimizada>);
 
     const rotas = Object.values(grouped);
-    
+
+    // parse shelf names like A40 -> { group: 'A', num: 40 }
+    function parseShelfNameLocal(name?: string) {
+      if (!name) return { group: '', num: 0 };
+      const trimmed = name.trim().toUpperCase();
+      const match = trimmed.match(/^([A-Z])(\d+)?/);
+      if (!match) return { group: '', num: 0 };
+      return { group: match[1], num: match[2] ? parseInt(match[2], 10) : 0 };
+    }
+
+    const groupOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
     rotas.sort((a, b) => {
-      const nomeA = a.prateleira.toLowerCase();
-      const nomeB = b.prateleira.toLowerCase();
-      
-      const letraA = nomeA.match(/[a-z]+/)?.[0] || '';
-      const numeroA = parseInt(nomeA.match(/\d+/)?.[0] || '0');
-      const letraB = nomeB.match(/[a-z]+/)?.[0] || '';
-      const numeroB = parseInt(nomeB.match(/\d+/)?.[0] || '0');
-      
-      if (letraA !== letraB) {
-        return letraA.localeCompare(letraB);
-      }
-      
-      return numeroA - numeroB;
+      const pa = parseShelfNameLocal(a.prateleira);
+      const pb = parseShelfNameLocal(b.prateleira);
+      const oa = groupOrder[pa.group] ?? 99;
+      const ob = groupOrder[pb.group] ?? 99;
+      if (oa !== ob) return oa - ob;
+      const asc = pa.group === 'A' || pa.group === 'C';
+      if (pa.num !== pb.num) return asc ? pa.num - pb.num : pb.num - pa.num;
+      return a.prateleira.localeCompare(b.prateleira);
     });
 
     return rotas;
@@ -282,6 +321,7 @@ export default function PickingPage() {
 
   // Gerar romaneio
   function handleGerarRomaneio() {
+    if (computingRef.current) return;
     // generate allocations and rota considering quantidade_caixa and stock across prateleiras
     (async () => {
       if (items.length === 0) {
@@ -289,6 +329,7 @@ export default function PickingPage() {
         return;
       }
 
+      computingRef.current = true;
       setLoading(true);
       try {
         const byProduct: Record<string, { boxes: number; produto_nome: string; produto_sku: string; quantidade_caixa: number }> = {};
@@ -302,7 +343,13 @@ export default function PickingPage() {
         const rotaMap: Record<string, { prateleira_nome: string; items: RotaOtimizada["items"] }> = {};
         const warnings: string[] = [];
 
-        // For each product, fetch all estoque entries and allocate
+        // For each product, fetch all estoque entries in parallel and allocate
+        const produtoIds = Object.keys(byProduct);
+        const entriesResults = await Promise.all(produtoIds.map((pid) => {
+          const params = new URLSearchParams({ searchField: "produto_id", search: String(pid), page: "1", limit: "100" });
+          return fetch(`/api/estoque?${params.toString()}`).then(r => r.json()).catch(() => ({ estoque: [] }));
+        }));
+
         // priority: use prateleiras in the order they were scanned (items array)
         const prateleiraPriority = Array.from(new Set(items.map(i => i.prateleira_id)));
         function getPriorityIndex(prId: string) {
@@ -310,30 +357,27 @@ export default function PickingPage() {
           return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
         }
 
-        for (const produtoId of Object.keys(byProduct)) {
+        for (let idx = 0; idx < produtoIds.length; idx++) {
+          const produtoId = produtoIds[idx];
           const info = byProduct[produtoId];
           const boxesNeeded = info.boxes;
           const unitsNeeded = boxesNeeded * (info.quantidade_caixa || 1);
 
-          const params = new URLSearchParams({ searchField: "produto_id", search: String(produtoId), page: "1", limit: "100" });
-          const res = await fetch(`/api/estoque?${params.toString()}`);
-          const data = await res.json();
+          const data = entriesResults[idx] || { estoque: [] };
           const entries = data.estoque || [];
 
           // compute total available units
           let totalAvailable = entries.reduce((s: number, e: any) => s + (e.quantidade || 0), 0);
 
-          let allocations: Array<{ prateleira_id: string; prateleira_nome: string; units: number }> = [];
+          let allocations: Array<{ prateleira_id: string; prateleira_nome: string; units: number; distribuidor_id?: number | string }> = [];
 
           if (totalAvailable >= unitsNeeded) {
-            // try to find a single prateleira that satisfies the need, prefer by scanned prateleira order
             const candidatesSingle = entries.filter((e: any) => (e.quantidade || 0) >= unitsNeeded)
               .sort((a: any, b: any) => getPriorityIndex(a.prateleira_id) - getPriorityIndex(b.prateleira_id));
             const single = candidatesSingle[0];
             if (single) {
-              allocations.push({ prateleira_id: single.prateleira_id, prateleira_nome: single.prateleira?.nome || single.prateleira_nome || "Sem prateleira", units: unitsNeeded });
+              allocations.push({ prateleira_id: single.prateleira_id, prateleira_nome: single.prateleira?.nome || single.prateleira_nome || "Sem prateleira", units: unitsNeeded, distribuidor_id: single.distribuidor_id });
             } else {
-              // combine: prefer prateleiras by scanned order (nearest first), then by larger quantity
               const sorted = [...entries].sort((a: any, b: any) => {
                 const pa = getPriorityIndex(a.prateleira_id);
                 const pb = getPriorityIndex(b.prateleira_id);
@@ -344,12 +388,11 @@ export default function PickingPage() {
               for (const e of sorted) {
                 if (remain <= 0) break;
                 const take = Math.min(remain, e.quantidade || 0);
-                if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: e.prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take });
+                if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: e.prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: e.distribuidor_id });
                 remain -= take;
               }
             }
           } else {
-            // allocate all available (in priority order) and warn
             warnings.push(info.produto_nome + " (falta " + (unitsNeeded - totalAvailable) + " unidades)");
             const sorted = [...entries].sort((a: any, b: any) => {
               const pa = getPriorityIndex(a.prateleira_id);
@@ -361,12 +404,11 @@ export default function PickingPage() {
             for (const e of sorted) {
               if (remain <= 0) break;
               const take = Math.min(remain, e.quantidade || 0);
-              if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: e.prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take });
+              if (take > 0) allocations.push({ prateleira_id: e.prateleira_id, prateleira_nome: e.prateleira?.nome || e.prateleira_nome || "Sem prateleira", units: take, distribuidor_id: e.distribuidor_id });
               remain -= take;
             }
           }
 
-          // convert allocations into rotaMap entries grouped by prateleira
           for (const a of allocations) {
             const boxesFromShelf = Math.ceil(a.units / (info.quantidade_caixa || 1));
             if (!rotaMap[a.prateleira_id]) rotaMap[a.prateleira_id] = { prateleira_nome: a.prateleira_nome, items: [] };
@@ -374,10 +416,27 @@ export default function PickingPage() {
           }
         }
 
-        // Convert rotaMap to array and sort by prateleira name
-        const rotas: RotaOtimizada[] = Object.keys(rotaMap).map((pid) => ({ prateleira: rotaMap[pid].prateleira_nome || pid, items: rotaMap[pid].items }));
+        let rotas: RotaOtimizada[] = Object.keys(rotaMap).map((pid) => ({ prateleira: rotaMap[pid].prateleira_nome || pid, items: rotaMap[pid].items }));
+        // sort rotas per shelf rules
+        function parseShelfNameLocal(name?: string) {
+          if (!name) return { group: '', num: 0 };
+          const trimmed = name.trim().toUpperCase();
+          const match = trimmed.match(/^([A-Z])(\d+)?/);
+          if (!match) return { group: '', num: 0 };
+          return { group: match[1], num: match[2] ? parseInt(match[2], 10) : 0 };
+        }
+        const groupOrder: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+        rotas.sort((a, b) => {
+          const pa = parseShelfNameLocal(a.prateleira);
+          const pb = parseShelfNameLocal(b.prateleira);
+          const oa = groupOrder[pa.group] ?? 99;
+          const ob = groupOrder[pb.group] ?? 99;
+          if (oa !== ob) return oa - ob;
+          const asc = pa.group === 'A' || pa.group === 'C';
+          if (pa.num !== pb.num) return asc ? pa.num - pb.num : pb.num - pa.num;
+          return a.prateleira.localeCompare(b.prateleira);
+        });
 
-        // As a fallback, if rotaMap empty (no estoque entries found), create simple grouping by scanned prateleira
         if (rotas.length === 0) {
           const fallback = otimizarRota(items);
           setRotaOtimizada(fallback);
@@ -386,11 +445,31 @@ export default function PickingPage() {
         }
 
         if (warnings.length > 0) {
-          setInsufficientWarnings(warnings);
+          const uniqueWarnings = Array.from(new Set(warnings));
+          setInsufficientWarnings(uniqueWarnings);
           setShowInsufficientModal(true);
         } else {
           setInsufficientWarnings([]);
         }
+
+        // build allocationsByProd with distribuidor_id
+        const allocationsByProd: Record<string, Allocation[]> = {};
+        for (const pid of produtoIds) {
+          const data = entriesResults[produtoIds.indexOf(pid)] || { estoque: [] };
+          const entries = data.estoque || [];
+          // find rota entries for this produto
+          for (const rId of Object.keys(rotaMap)) {
+            const pr = rotaMap[rId];
+            for (const it of pr.items) {
+              if (it.produto_id !== pid) continue;
+              if (!allocationsByProd[pid]) allocationsByProd[pid] = [];
+              const found = entries.find((e: any) => String(e.prateleira_id) === String(rId));
+              allocationsByProd[pid].push({ prateleira_id: rId, prateleira_nome: pr.prateleira_nome, boxes: it.boxes, units: it.units, insufficient: !!it.insufficient, distribuidor_id: found ? found.distribuidor_id : undefined });
+            }
+          }
+        }
+
+        setAllocationsMap(allocationsByProd);
 
         setShowRomaneio(true);
       } catch (err) {
@@ -398,6 +477,7 @@ export default function PickingPage() {
         alert("Erro ao gerar romaneio");
       } finally {
         setLoading(false);
+        computingRef.current = false;
       }
     })();
   }
@@ -411,6 +491,38 @@ export default function PickingPage() {
 
     setLoading(true);
     try {
+      // Retirar itens do estoque conforme allocationsMap
+      for (const prodId of Object.keys(allocationsMap)) {
+        const alList = allocationsMap[prodId] || [];
+        for (const alloc of alList) {
+          try {
+            const body: any = { produto_id: prodId, prateleira_id: alloc.prateleira_id, tipo: 'retirar', quantidade: alloc.units };
+            if (alloc.distribuidor_id) {
+              body.distribuidor_id = alloc.distribuidor_id;
+            } else {
+              const r = await fetch(`/api/estoque?searchField=produto_id&search=${encodeURIComponent(String(prodId))}&page=1&limit=100`);
+              if (r.ok) {
+                const d = await r.json();
+                const found = (d.estoque || []).find((e: any) => String(e.prateleira_id) === String(alloc.prateleira_id));
+                if (found) body.distribuidor_id = found.distribuidor_id;
+              }
+            }
+
+            if (!body.distribuidor_id) {
+              console.warn('Distribuidor não encontrado para retirada', prodId, alloc.prateleira_id);
+              continue;
+            }
+
+            const r2 = await fetch('/api/estoque', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!r2.ok) {
+              console.warn('Falha ao retirar estoque para', prodId, alloc.prateleira_id, await r2.text());
+            }
+          } catch (err) {
+            console.error('Erro ao processar retirada de estoque', err);
+          }
+        }
+      }
+
       const res = await fetch("/api/picking", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -502,11 +614,11 @@ export default function PickingPage() {
                           </div>
                         </div>
                         <div>
-                          <span className={`px-3 py-1 rounded text-sm ${
-                            rom.status === "pendente" ? "bg-yellow-100 text-yellow-800" : "bg-blue-100 text-blue-800"
-                          }`}>
-                            {rom.status}
-                          </span>
+                                  <span className={`px-3 py-1 rounded text-sm ${
+                                    rom.status === "pendente" ? "bg-yellow-100 text-yellow-800" : (rom.status === "concluido" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")
+                                  }`}>
+                                    {rom.status === "pendente" ? "Pendente" : (rom.status === "concluido" ? "Concluído" : "Em andamento")}
+                                  </span>
                         </div>
                       </div>
                     ))}
@@ -599,15 +711,17 @@ export default function PickingPage() {
                     placeholder="Código de barras..."
                     value={codBarras}
                     onChange={(e) => setCodBarras(e.target.value)}
-                    onKeyDown={(e) => {
+                    onKeyDown={async (e) => {
                       if (e.key === "Enter") {
-                        handleScan();
+                        e.preventDefault();
+                        await handleScan();
+                        scheduleFocus();
                       }
                     }}
                     className="flex-1"
                     disabled={loading}
                   />
-                  <Button onClick={handleScan} disabled={loading || !codBarras.trim()}>
+                  <Button onMouseDown={(e) => e.preventDefault()} onClick={async () => { await handleScan(); scheduleFocus(); }} disabled={loading || !codBarras.trim()}>
                     {loading ? "Buscando..." : "Adicionar"}
                   </Button>
                 </div>
@@ -669,9 +783,9 @@ export default function PickingPage() {
               {/* Botão para gerar romaneio */}
               {items.length > 0 && (
                 <div className="flex justify-end gap-2">
-                  <Button onClick={handleGerarRomaneio} className="bg-blue-600 hover:bg-blue-700">
+                  <Button onClick={handleGerarRomaneio} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
                     <FileText className="w-4 h-4 mr-2" />
-                    Gerar Romaneio
+                    {loading ? 'Gerando...' : 'Gerar Romaneio'}
                   </Button>
                 </div>
               )}

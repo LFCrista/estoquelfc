@@ -99,10 +99,12 @@ export async function PATCH(req: Request) {
 				novaQuantidade += quantidade;
 			} else if (tipo === "retirar") {
 				if (quantidade > estoque.quantidade) {
-					console.warn("Quantidade a retirar maior que o estoque disponível", { quantidade, estoque: estoque.quantidade });
-					return NextResponse.json({ error: "Quantidade a retirar maior que o estoque disponível" }, { status: 400 });
+					console.warn("Quantidade a retirar maior que o estoque disponível - zerando estoque", { quantidade, estoque: estoque.quantidade });
+					// Se for maior, zera o estoque conforme solicitado
+					novaQuantidade = 0;
+				} else {
+					novaQuantidade -= quantidade;
 				}
-				novaQuantidade -= quantidade;
 			}
 
 			const { error: updateError } = await supabase
